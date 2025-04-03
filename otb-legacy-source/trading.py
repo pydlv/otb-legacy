@@ -526,7 +526,6 @@ def listen_for_inbound_trades():
                     else:
                         their_offer = copy.deepcopy(offer)
 
-                print(my_offer, their_offer, "test debug")
                 assert my_offer is not None
                 assert their_offer is not None
 

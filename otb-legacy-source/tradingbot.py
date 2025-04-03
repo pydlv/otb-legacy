@@ -216,7 +216,6 @@ except IOError:
 last_rolimons_trade_ads_fetch = time.time() - 120
 
 def find_people():
-    print("trying to find people")
     global last_rolimons_trade_ads_fetch
 
     # Try to load state of previous session
