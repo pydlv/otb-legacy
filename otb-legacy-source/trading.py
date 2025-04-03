@@ -1,4 +1,6 @@
 import copy
+import sys
+import os
 import itertools
 import json
 import logging
@@ -19,6 +21,7 @@ import valuemanager
 from log import log
 from session import session
 from settings import settings
+from authenticator import AuthHandler
 
 safeItems = []
 
@@ -60,6 +63,8 @@ for part in parts:
             do_not_trade_for.append(int(part))
         except ValueError:
             pass
+
+Authenticator = AuthHandler(settings["General"]["authenticator_code"])
 
 trade_cooldown_time = float(settings["Trading"]["minimum_time_between_trades"])
 auto_adjust_time_between_trades = settings["Trading"]["auto_adjust_time_between_trades"] == "true"
@@ -173,52 +178,50 @@ def get_inventory(user_id):
 
     inventory_raw = []
 
+    #NOTE: I don't like the original approach because you get ratelimited every user you scan -Flaried
+
     # Good job tardblox, now I get to send EVEN MORE http requests to your server :DDDDD
     # Wasting resources is fun! 8x more to be exact :-)
-    accessory_asset_type_ids = [8, 41, 42, 43, 44, 45, 46, 47]
-    other_asset_type_ids = [19, 18]
-    asset_type_ids = (accessory_asset_type_ids + other_asset_type_ids
-                      if settings["Trading"]["only_trade_accessories"] != "true"
-                      else accessory_asset_type_ids[:])
+    # accessory_asset_type_ids = [8, 41, 42, 43, 44, 45, 46, 47]
+    # other_asset_type_ids = [19, 18]
+    # asset_type_ids = (accessory_asset_type_ids + other_asset_type_ids
+    #                   if settings["Trading"]["only_trade_accessories"] != "true"
+    #                   else accessory_asset_type_ids[:])
 
-    for assetTypeId in asset_type_ids:
-        cursor = ""
+    cursor = ""
+    while cursor is not None:  # Continue until we've loaded all of this asset type
+        data = None
 
-        while cursor is not None:  # Continue until we've loaded all of this asset type
-            data = None
+        for i in range(5):  # Up to 5 attempts
+            url ="https://inventory.roblox.com/v1/users/%(userId)i/assets/collectibles?""cursor=%(cursor)s&sortOrder=Desc&limit=100" % { # &assetType=%(assetTypeId)i" % {
+                "userId": int(user_id), "cursor": cursor}#, "assetTypeId": assetTypeId}
+            response = session.get(url)
 
-            for i in range(5):  # Up to 5 attempts
-                url ="https://inventory.roblox.com/v1/users/%(userId)i/assets/collectibles?""cursor=%(cursor)s&sortOrder=Desc&limit=100&assetType=%(assetTypeId)i" % {
-                        "userId": int(user_id), "cursor": cursor, "assetTypeId": assetTypeId}
-                response = session.get(url)
+            data = json.loads(response.text)
 
-                data = json.loads(response.text)
+            if response.status_code == 503:
+                log("Inventory request failed. Trying again.", mycolors.WARNING)
+                time.sleep(1)
+                continue
 
-                if response.status_code == 503:
-                    log("Inventory request failed. Trying again.", mycolors.WARNING)
-                    time.sleep(1)
-                    continue
-
-                if response.status_code == 429: 
-                    log("Loading Inventory throttled retrying.", mycolors.WARNING)
-                    time.sleep(10)
-                    if i >= 5:
-                        log("Failed to load inventory. Exiting.", mycolors.FAIL)
-                        sys.exit(0)
-                    continue
+            if response.status_code == 429: 
+                log("Loading Inventory throttled retrying.", mycolors.WARNING)
+                time.sleep(10)
+                if i >= 5:
+                    log("Failed to load inventory. Exiting.", mycolors.FAIL)
+                    sys.exit(0)
+                continue
 
 
-                if "errors" in data:
-                    for err in data["errors"]:
-                        logging.warning("Failed to load inventory: %s" % (err["message"]))
-                    print(response.status_code)
-                    raise FailedToLoadInventoryException
+            if "errors" in data:
+                for err in data["errors"]:
+                    logging.warning("Failed to load inventory: %s" % (err["message"]))
+                raise FailedToLoadInventoryException
 
-                break
+            break
 
-            cursor = data["nextPageCursor"]
-            inventory_raw += data["data"]
-    print("out of loop")
+        cursor = data["nextPageCursor"]
+        inventory_raw += data["data"]
 
     inventory = []
     for item in inventory_raw:
@@ -267,7 +270,7 @@ def sale_manager():
                         for i in range(reseller_position, 10):
                             if len(sellers) >= i:
                                 competitor = sellers[i - 1]
-                                if competitor["seller"]["id"] != int(settings["Authentication"]["userid"]) \
+                                if competitor["seller"]["id"] != int(session.cookies['user_id']) \
                                         or competitor["userAssetId"] == item["userAssetId"]:
                                     if competitor["userAssetId"] == item["userAssetId"]:
                                         price = competitor["price"]
@@ -417,6 +420,14 @@ def send_trade(user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_r
         error_output_text = " ".join([error["message"] for error in errors])
 
         if response.status_code == 429:
+            if "errors" in response.json():
+                if "you are sending too many trade requests" in response.json()['errors'][0]['message'].lower():
+                            log(f"{session.cookies['username']} has hit the daily 100 trade limit exiting", mycolors.WARNING)
+                            os._exit(0)
+                            return "ratelimited"
+
+
+
             log("Trade with %i: Roblox is throttling us, waiting and trying again. Current cooldown is at %i."
                 % (user_id, trade_cooldown_time), mycolors.WARNING)
 
@@ -426,6 +437,10 @@ def send_trade(user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_r
             send_trade(user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True)
         else:
             log("Failed to send trade. %s" % error_output_text, mycolors.FAIL)
+            if "Challenge is required to authorize the request" in error_output_text:
+                ok = Authenticator.validate_2fa(response, session)
+                log(f"response from 2fa: {of}", no_print=True)
+                send_trade(user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True)
             if "userAssets are invalid" in error_output_text:
                 remove_trades_with_invalid_items_from_queue()
     else:
@@ -976,8 +991,8 @@ def search_for_trades(user_id, guarantee_trade=False):
     random.shuffle(their_inventory)
 
     def combos(inventory_length, max_combo_length):
-        nums = range(inventory_length)
-        lengths = range(max_combo_length, 0, -1)
+        nums = list(range(inventory_length))
+        lengths = list(range(max_combo_length, 0, -1)) 
 
         if settings["Trading"]["vary_trade_grades"] == "true":
             random.shuffle(nums)
@@ -1042,9 +1057,9 @@ def search_for_trades(user_id, guarantee_trade=False):
 
         if minimum_rap_gain is None:
             meets_rap_requirement = True
-        if 1.0 > minimum_rap_gain >= 0.0:
+        if minimum_rap_gain is not None and 1.0 > minimum_rap_gain >= 0.0:
             meets_rap_requirement = their_total_rap > my_total_rap * (1.0 + minimum_rap_gain)
-        elif minimum_rap_gain >= 1:
+        elif minimum_rap_gain is not None and minimum_rap_gain >= 1:
             meets_rap_requirement = their_total_rap > my_total_rap + minimum_rap_gain
 
         if not meets_rap_requirement:
