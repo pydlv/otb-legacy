@@ -869,11 +869,12 @@ def search_for_trades(user_id, guarantee_trade=False):
     is_admin = False
 
     response = session.get(
-        "https://www.roblox.com/badges/roblox?userId=%i&imgWidth=110&imgHeight=110&imgFormat=png" % user_id)
+        "https://accountinformation.roblox.com/v1/users/%i/roblox-badges" % user_id)
+
     data = json.loads(response.text)
     if len(data) > 0:  # Apparently Roblox returns a blank dictionary if the user has no badges.
-        for item in data["RobloxBadges"]:
-            if item["Name"] == "Administrator":
+        for item in data:
+            if item["name"] == "Administrator":
                 is_admin = True
                 precheck = False
 
