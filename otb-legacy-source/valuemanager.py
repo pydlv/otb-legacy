@@ -61,12 +61,39 @@ def generate_value(item_id):
 
     decoded = None
 
+    #NOTE: these are set so we can use both V1 and V2 APIs without changing item id or url
+    url = None
+    resale_id = item_id
     while True:
-        response = session.get("https://economy.roblox.com/v1/assets/%i/resale-data" % item_id)
+        # NOTE: Assume the URL is the v1 API (all older items)
+        if url == None:
+            url = f"https://economy.roblox.com/v1/assets/{resale_id}/resale-data"
+
+        response = session.get(url)
 
         if response.status_code == 429:
             log("Got too many requests. Waiting and trying again.", mycolors.WARNING)
             time.sleep(5)
+            continue
+        # NOTE: Handle new items that use the v2 API
+        elif response.status_code == 400:
+            log("Item uses new API retrying..", mycolors.WARNING)
+            item_details = session.get(f"https://catalog.roblox.com/v1/catalog/items/{item_id}/details?itemType=asset")
+            if item_details.status_code == 429:
+                log("Got too many requests. Waiting and trying again.", mycolors.WARNING)
+                time.sleep(5)
+                continue
+
+            if item_details.status_code != 200:
+                print(item_details.status_code)
+                log("Failed to load item details. Exiting.", mycolors.FAIL)
+                sys.exit(0)
+
+            detail_data = item_details.json()
+            if "collectibleItemId" in detail_data:
+                resale_id = detail_data['collectibleItemId']
+                url = f"https://apis.roblox.com/marketplace-sales/v1/item/{resale_id}/resale-data"
+
             continue
 
         decoded = json.loads(response.text)
