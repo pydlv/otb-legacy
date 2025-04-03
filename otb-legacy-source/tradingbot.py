@@ -120,32 +120,34 @@ def get_is_logged_in_and_run_privacy_checks():
 # Login to Roblox account
 log("Logging into account...", mycolors.OKBLUE)
 
-# Comment out to require authentication with .ROBLOSECURITY
-if settings["Debugging"]["easy_debug"] != "true":
-    request = session.post("https://auth.roblox.com/v1/login",
-                           headers={
-                               "Content-Type": "application/json",
-                               "Origin": "https://www.roblox.com",
-                               "X-CSRF-TOKEN": trading.get_xsrf()
-                           },
-                           data=json.dumps({
-                               "cvalue": settings["Authentication"]["username"],
-                               "ctype": "Username",
-                               "password": settings["Authentication"]["password"]})
-                           )
+# # Comment out to require authentication with .ROBLOSECURITY
+# if settings["Debugging"]["easy_debug"] != "true":
+#     request = session.post("https://auth.roblox.com/v1/login",
+#                            headers={
+#                                "Content-Type": "application/json",
+#                                "Origin": "https://www.roblox.com",
+#                                "X-CSRF-TOKEN": trading.get_xsrf()
+#                            },
+#                            data=json.dumps({
+#                                "cvalue": settings["Authentication"]["username"],
+#                                "ctype": "Username",
+#                                "password": settings["Authentication"]["password"]})
+#                            )
+#
 
 # Check that login was successful
+# if get_is_logged_in_and_run_privacy_checks():
+#     log("Login successful.", mycolors.OKBLUE)
+# else:
+#     log("Could not login with credentials. Attempting to authenticate with .ROBLOSECURITY cookie.", mycolors.WARNING)
+
+session.cookies.set(".ROBLOSECURITY", settings["General"]["roblosecurity"].strip(), domain="roblox.com")
 if get_is_logged_in_and_run_privacy_checks():
-    log("Login successful.", mycolors.OKBLUE)
+    log("Login successful with .ROBLOSECURITY.", mycolors.OKBLUE)
 else:
-    log("Could not login with credentials. Attempting to authenticate with .ROBLOSECURITY cookie.", mycolors.WARNING)
-    session.cookies.set(".ROBLOSECURITY", settings["Authentication"]["roblosecurity"].strip(), domain="roblox.com")
-    if get_is_logged_in_and_run_privacy_checks():
-        log("Login successful with .ROBLOSECURITY.", mycolors.OKBLUE)
-    else:
-        log("Failed to login with .ROBLOSECURITY.\n\nMake sure 2-factor authentication is off, "
-            "or provide a valid .ROBLOSECURITY cookie.", mycolors.FAIL)
-        sys.exit(0)
+    log("Failed to login with .ROBLOSECURITY.\n\nMake sure 2-factor authentication is off, "
+        "or provide a valid .ROBLOSECURITY cookie.", mycolors.FAIL)
+    sys.exit(0)
 
 
 def continuously_verify_logged_in():
@@ -309,7 +311,7 @@ def find_people():
         try:
             if time.time() - last_rolimons_trade_ads_fetch >= 120:
                 # It has been at least two minutes, we are safe to fetch
-                response = session.get("https://www.rolimons.com/tradeadsapi/getrecentads")
+                response = session.get("https://api.rolimons.com/tradeads/v1/getrecentads")
                 decoded = json.loads(response.text)
 
                 ids = [int(ad[2]) for ad in decoded["trade_ads"]]
