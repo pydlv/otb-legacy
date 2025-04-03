@@ -20,8 +20,6 @@ from log import log
 from session import session
 from settings import settings
 
-MY_USER_ID = int(settings["Authentication"]["userid"])
-
 safeItems = []
 
 tradeSendQueue = []
@@ -190,10 +188,9 @@ def get_inventory(user_id):
             data = None
 
             for i in range(5):  # Up to 5 attempts
-                response = session.get(
-                    "https://inventory.roblox.com/v1/users/%(userId)i/assets/collectibles?"
-                    "cursor=%(cursor)s&sortOrder=Desc&limit=100&assetType=%(assetTypeId)i" % {
-                        "userId": int(user_id), "cursor": cursor, "assetTypeId": assetTypeId})
+                url ="https://inventory.roblox.com/v1/users/%(userId)i/assets/collectibles?""cursor=%(cursor)s&sortOrder=Desc&limit=100&assetType=%(assetTypeId)i" % {
+                        "userId": int(user_id), "cursor": cursor, "assetTypeId": assetTypeId}
+                response = session.get(url)
 
                 data = json.loads(response.text)
 
@@ -202,23 +199,33 @@ def get_inventory(user_id):
                     time.sleep(1)
                     continue
 
+                if response.status_code == 429: 
+                    log("Loading Inventory throttled retrying.", mycolors.WARNING)
+                    time.sleep(10)
+                    if i >= 5:
+                        log("Failed to load inventory. Exiting.", mycolors.FAIL)
+                        sys.exit(0)
+                    continue
+
+
                 if "errors" in data:
                     for err in data["errors"]:
                         logging.warning("Failed to load inventory: %s" % (err["message"]))
+                    print(response.status_code)
                     raise FailedToLoadInventoryException
 
                 break
 
             cursor = data["nextPageCursor"]
-
             inventory_raw += data["data"]
+    print("out of loop")
 
     inventory = []
     for item in inventory_raw:
         new_item = add_extra_info(item)
         # Only do this for our inventory
         if (settings["Trading"]["value_op_items_at_rap"] == "true" and int(
-                settings["Authentication"]["userid"]) == user_id):
+                session.cookies['user_id']) == user_id):
             if new_item["AveragePrice"] > new_item["value"]:
                 new_item["value"] = new_item["AveragePrice"]
         inventory.append(new_item)
@@ -235,7 +242,7 @@ def sale_manager():
 
     while True:
         try:
-            my_inventory = get_inventory(settings["Authentication"]["userid"])
+            my_inventory = get_inventory(session.cookies['user_id'])
             filtered_inventory = []
             for item in my_inventory:
                 if not item["itemId"] in safeItems and \
@@ -349,7 +356,7 @@ def create_offer(user_id, items, robux):
 
 def remove_trades_with_invalid_items_from_queue():
     global trade_queue_insertion_timestamps
-    my_inventory = get_inventory(MY_USER_ID)
+    my_inventory = get_inventory(session.cookies['user_id'])
     my_uaids = [item["userAssetId"] for item in my_inventory]
 
     for trade in tradeSendQueue:
@@ -372,7 +379,7 @@ def send_trade(user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_r
         mycolors.OKGREEN, post_to_webhook=(not is_repeat))
 
     offers = [
-        create_offer(MY_USER_ID, trade[1], 0),
+        create_offer(session.cookies['user_id'], trade[1], 0),
         create_offer(user_id, trade[2], their_robux)
     ]
 
@@ -499,11 +506,12 @@ def listen_for_inbound_trades():
                 their_offer = None
 
                 for offer in trade_data["offers"]:
-                    if offer["user"]["id"] == MY_USER_ID:
+                    if int(offer["user"]["id"]) == int(session.cookies['user_id']):
                         my_offer = copy.deepcopy(offer)
                     else:
                         their_offer = copy.deepcopy(offer)
 
+                print(my_offer, their_offer, "test debug")
                 assert my_offer is not None
                 assert their_offer is not None
 
@@ -879,7 +887,7 @@ def search_for_trades(user_id, guarantee_trade=False):
             pass
         return
 
-    my_inventory = get_inventory(MY_USER_ID)
+    my_inventory = get_inventory(session.cookies['user_id'])
 
     try:
         their_inventory = get_inventory(user_id)
