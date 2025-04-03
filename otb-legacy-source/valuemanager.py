@@ -1,4 +1,5 @@
-import datetime
+from datetime import datetime, timedelta
+
 import json
 import time
 
@@ -55,6 +56,30 @@ def write_value(item_id, value, volume, age):
     with open("values", "w") as f:
         f.write(compiled_str)
 
+# NOTE: More dynamic for parsing dates, because the v1 and v2 API dates are different formats? (goodjob roblox)
+def parse_date(date_str):
+    # Define the possible time formats
+    time_formats = [
+        "%Y-%m-%dT%H:%M:%SZ",       # Format with 'Z' (UTC indicator)
+        "%Y-%m-%dT%H:%M:%S.%fZ",    # Format with fractional seconds and 'Z'
+        "%Y-%m-%dT%H:%M:%S.%f",     # Format with fractional seconds, no 'Z'
+    ]
+
+    # Check if there is a '.' to handle microsecond truncation
+    if '.' in date_str:
+        date_str = date_str.split('.')[0] + '.' + date_str.split('.')[1][:6]  # Ensures only 6 digits for microseconds
+
+    for time_format in time_formats:
+        try:
+            return datetime.strptime(date_str, time_format)
+        except ValueError:
+            continue      
+
+    # Return None if all formats fail
+
+    return None
+
+
 
 def generate_value(item_id):
     log("Generating value for %i..." % item_id)
@@ -102,7 +127,7 @@ def generate_value(item_id):
     def api_data_to_list(items):
         result = []
         for item in items:
-            dt = datetime.datetime.strptime(item["date"], "%Y-%m-%dT%H:%M:%SZ")
+            dt = parse_date(item["date"])
             timestamp = time.mktime(dt.timetuple())
             value = item["value"]
 
