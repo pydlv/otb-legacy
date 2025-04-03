@@ -1,12 +1,15 @@
-import ConfigParser
-import StringIO
+import configparser
+import io
 import sys
 
 # Default config.ini file
 contents = """
 [General]
-whitelist_user = user goes here
-whitelist_pass = pass goes here
+ROBLOSECURITY = put your .roblosecurity here
+
+# https://www.youtube.com/watch?v=2SdEivsw8yA (This video shows how to get the Authenticator Secret at 0:25)
+authenticator_code = enter auth code here
+
 
 colors = false
 
@@ -18,20 +21,6 @@ switch_proxy_every_minutes = 10
 
 # You can put a discord webhook here and the bot will post when it sends a trade, accepts, or declines one.
 webhook_url = none
-
-[Authentication]
-# This is required. Please make sure you enter your Roblox user ID at https://olympian.xyz/ or else whitelist 
-# authentication will fail.
-userid = 1234567890
-
-# you can use either username/password auth or .roblosecurity
-# both are not required
-# you can leave 2fa enabled if you use .roblosecurity
-
-username = roblox username
-password = roblox password
-
-ROBLOSECURITY = put your .roblosecurity here
 
 [Trading]
 # If not set to false, then the bot will not send/accept/decline any trades or sell items.
@@ -177,16 +166,15 @@ easy_debug = false
 memory_debugging = false
 """
 
+
+
 try:
-    f = open("config.ini", "r")
-    f.read()
-    f.close()
+    with open("config.ini", "r") as f:
+        f.read()
 except IOError:
     # File doesn't exist, let's create it with the default
-    f = open("config.ini", "w")
-    f.write(contents)
-    f.close()
-
+    with open("config.ini", "w") as f:
+        f.write(contents)
     print("Created config.ini. Please edit it, and then rerun.")
     sys.exit(0)
 
@@ -195,10 +183,9 @@ with open("config.example.ini", "w") as f:
     f.write(contents)
 
 # Read config
-config = ConfigParser.SafeConfigParser()
+config = configparser.ConfigParser()
 config.read("config.ini")
 sections = config.sections()
-
 
 def config_section_map(c, section):
     dict1 = {}
@@ -212,15 +199,14 @@ def config_section_map(c, section):
             dict1[option] = None
     return dict1
 
-
 settings = {}
 
 for section in sections:
     settings[section] = config_section_map(config, section)
 
-config2 = ConfigParser.ConfigParser()
-buf = StringIO.StringIO(contents)
-config2.readfp(buf)
+config2 = configparser.ConfigParser()
+buf = io.StringIO(contents)
+config2.read_file(buf)
 
 defaultSettings = {}
 
@@ -234,7 +220,7 @@ for section in sections:
         config.add_section(section)
         settings[section] = {}
         updated = True
-    for k in defaultSettings[section].keys():
+    for k in defaultSettings[section]:
         if k not in settings[section]:
             config.set(section, k, defaultSettings[section][k])
             settings[section][k] = defaultSettings[section][k]
@@ -243,3 +229,4 @@ for section in sections:
 if updated:
     with open("config.ini", "w") as f:
         config.write(f)
+

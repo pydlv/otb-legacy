@@ -1,4 +1,5 @@
-import datetime
+from datetime import datetime, timedelta
+
 import json
 import time
 
@@ -55,18 +56,68 @@ def write_value(item_id, value, volume, age):
     with open("values", "w") as f:
         f.write(compiled_str)
 
+# NOTE: More dynamic for parsing dates, because the v1 and v2 API dates are different formats? (goodjob roblox)
+def parse_date(date_str):
+    # Define the possible time formats
+    time_formats = [
+        "%Y-%m-%dT%H:%M:%SZ",       # Format with 'Z' (UTC indicator)
+        "%Y-%m-%dT%H:%M:%S.%fZ",    # Format with fractional seconds and 'Z'
+        "%Y-%m-%dT%H:%M:%S.%f",     # Format with fractional seconds, no 'Z'
+    ]
+
+    # Check if there is a '.' to handle microsecond truncation
+    if '.' in date_str:
+        date_str = date_str.split('.')[0] + '.' + date_str.split('.')[1][:6]  # Ensures only 6 digits for microseconds
+
+    for time_format in time_formats:
+        try:
+            return datetime.strptime(date_str, time_format)
+        except ValueError:
+            continue      
+
+    # Return None if all formats fail
+
+    return None
+
+
 
 def generate_value(item_id):
     log("Generating value for %i..." % item_id)
 
     decoded = None
 
+    #NOTE: these are set so we can use both V1 and V2 APIs without changing item id or url
+    url = None
+    resale_id = item_id
     while True:
-        response = session.get("https://economy.roblox.com/v1/assets/%i/resale-data" % item_id)
+        # NOTE: Assume the URL is the v1 API (all older items)
+        if url == None:
+            url = f"https://economy.roblox.com/v1/assets/{resale_id}/resale-data"
 
+        response = session.get(url)
         if response.status_code == 429:
-            log("Got too many requests. Waiting and trying again.", mycolors.WARNING)
-            time.sleep(5)
+            log("Got too many requests on resale-data, Waiting 15s and trying again.", mycolors.WARNING)
+            time.sleep(15)
+            continue
+        # NOTE: Handle new items that use the v2 API
+        elif response.status_code == 400:
+            log("Item uses new API retrying..", mycolors.WARNING)
+            item_details = session.get(f"https://catalog.roblox.com/v1/catalog/items/{item_id}/details?itemType=asset")
+            if item_details.status_code == 429:
+                log("Got too many on item details requests. Waiting 15s and trying again.", mycolors.WARNING)
+                time.sleep(15)
+                continue
+
+            if item_details.status_code != 200:
+                print(item_details.status_code)
+                log("Failed to load item details. Exiting.", mycolors.FAIL)
+                sys.exit(0)
+
+            detail_data = item_details.json()
+            if "collectibleItemId" in detail_data:
+                resale_id = detail_data['collectibleItemId']
+                url = f"https://apis.roblox.com/marketplace-sales/v1/item/{resale_id}/resale-data"
+
             continue
 
         decoded = json.loads(response.text)
@@ -75,7 +126,7 @@ def generate_value(item_id):
     def api_data_to_list(items):
         result = []
         for item in items:
-            dt = datetime.datetime.strptime(item["date"], "%Y-%m-%dT%H:%M:%SZ")
+            dt = parse_date(item["date"])
             timestamp = time.mktime(dt.timetuple())
             value = item["value"]
 
