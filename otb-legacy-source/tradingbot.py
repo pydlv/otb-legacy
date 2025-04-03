@@ -39,7 +39,6 @@ proxy.start_proxy_loop()
 # Overrides
 settings["Trading"]["minimum_value_for_rbx_rocks"] = "-1"
 
-userLinkPattern = re.compile(r"https://www\.roblox\.com/users/(\d+)/profile")
 
 log("Starting Olympian trading bot.", no_print=True, post_to_webhook=True)
 log("Welcome to Olympian trading bot version %i!" % VERSION, mycolors.OKGREEN)
@@ -48,93 +47,9 @@ log("Welcome to Olympian trading bot version %i!" % VERSION, mycolors.OKGREEN)
 log("Trading settings: %s" % settings["Trading"], no_print=True)
 
 
-def down(x):
-    return int(math.floor(x / 100.0)) * 100
-
-
-pubkey = "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUF5NVhlUD" \
-         "ZJckc1M1cxRENBcWUxegozVC8wWHZrc1V6cVN4bUNMazVEMzkrckM4YnozTDZJM2xtOVNiMmcrK2x3UXRhWkw3d2R4STRiVUdWZGZ5" \
-         "dGNECkFzNDh3V3M3WUxlamdEK0VBUEUyTkkzcGwyQnJwTFg4b1VHaWwxNjNROGZ6U2JRWitBK0lXSkZlWkVzZ1l5S3oKTk1TYmFlUz" \
-         "NQNWl2SnJrdlVCdFRnOFVCQzJiWW1lL3hKNlQ5cVBSRU1EN0VYTGlxb1RKTmUyNzhDa0I2ODVQcwpMbHFidCtvVGJPTFhkME1TaWUy" \
-         "RzZHRHpYK2VBL2xBYWF3QjUxS3BjYlBJa01Tc0dLVG9kN0loSlhLOXNsUEExCjZlNmhuakJTazRYc2l5RllSMTF5b01Mc215YzlZdm" \
-         "xVSGRZS2lqYStIYmRRWGx4SHJTVmoyaXFRZTZHM3dybDUKcndJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg=="
-
-
-def verify_message(msg, sig):
-    rsa_key = RSA.importKey(b64decode(pubkey))
-    signer = PKCS1_v1_5.new(rsa_key)
-    digest = SHA256.new()
-    digest.update(msg)
-
-    return signer.verify(digest, b64decode(sig))
-
 
 def is_whitelist_valid():
-    log("Authenticating with whitelist...", mycolors.OKBLUE)
-
-    auth_session = requests.Session()
-    auth_session.trust_env = False  # Don't use proxies, etc.
-
-    try:
-        request = auth_session.post("https://oly.nobelium.xyz/whitelist.php",
-                               headers={
-                                   "User-Agent": "python-requests/2.2.1"
-                               },
-                               data={
-                                   "username": settings["General"]["whitelist_user"],
-                                   "password": settings["General"]["whitelist_pass"]
-                               })
-    except requests.exceptions.SSLError:
-        log("Could not establish a secure connection with whitelist server.", mycolors.FAIL)
-        return False
-    response = request.text
-
-    ok = False
-
-    if response == "no":
-        return False
-
-    try:
-        data = json.loads(response)
-    except ValueError:
-        log("Faulty response from whitelist server.", mycolors.FAIL)
-        return False
-
-    if "msg" not in data or "sig" not in data:
-        log("Faulty response from whitelist server.", mycolors.FAIL)
-        return False
-
-    # noinspection PyBroadException
-    try:
-        is_valid_signature = verify_message(data["msg"], data["sig"])
-        if not is_valid_signature:
-            log("Response from whitelist server was tampered with.", mycolors.FAIL)
-            return False
-    except Exception:
-        log("Could not verify signature.", mycolors.FAIL)
-        return False
-
-    try:
-        data = json.loads(data["msg"])
-        if int(data["version"]) <= VERSION:
-            # Allow 10 minute deviation in time
-            if abs(int(data["nonce"]) - time.time()) <= 600:
-                valid_ids = data["accounts"]
-
-                if int(settings["Authentication"]["userid"]) in valid_ids:
-                    ok = True
-                else:
-                    log("Roblox account not authenticated. Please log into https://olympian.xyz/", mycolors.FAIL)
-            else:
-                log("Nonce verification failed. Please sync your system clock.", mycolors.FAIL)
-        else:
-            log("Your version of olympian is outdated. Please download the latest version from the website.",
-                mycolors.FAIL)
-            sys.exit(0)
-    except (IndexError, ValueError, KeyError):
-        pass
-
-    return ok
+    return True
 
 
 ok = is_whitelist_valid()
@@ -144,6 +59,19 @@ if not ok:
     sys.exit(0)
 else:
     log("Whitelist authentication passed! Moving on...", mycolors.OKGREEN)
+
+def fetch_userid_and_name():
+    """
+        Gets info on the current account to self class
+    """
+    auth_response = session.get("https://users.roblox.com/v1/users/authenticated")
+    print(auth_response.text, auth_response.cookies)
+
+    if auth_response.status_code == 200: 
+            return str(auth_response.json()['id']), auth_response.json()['name']
+    else:
+        raise ValueError(f"Couldnt login with cookie")
+
 
 
 def get_is_logged_in_and_run_privacy_checks():
@@ -171,13 +99,18 @@ def get_is_logged_in_and_run_privacy_checks():
         if not can_trade:
             log("User is not able to trade. Please check your privacy settings.", mycolors.FAIL)
             sys.exit(0)
-
+        
         response = session.get("https://accountsettings.roblox.com/v1/trade-privacy")
         data = json.loads(response.text)
         if data["tradePrivacy"] != "All":
             log("Trade privacy setting is not set to everyone. Please fix this before running again. Exiting.",
                 mycolors.FAIL)
             sys.exit(0)
+
+        # NOTE: Store in cookies, because I cant be bothered adding classes to this source code
+        USERID, USERNAME = fetch_userid_and_name()
+        session.cookies['user_id'] = USERID
+        session.cookies['username'] = USERNAME
 
         return True
     else:
@@ -186,7 +119,7 @@ def get_is_logged_in_and_run_privacy_checks():
 
 
 # Login to Roblox account
-log("Logging into account: %s..." % settings["Authentication"]["username"], mycolors.OKBLUE)
+log("Logging into account...", mycolors.OKBLUE)
 
 # Comment out to require authentication with .ROBLOSECURITY
 if settings["Debugging"]["easy_debug"] != "true":
@@ -239,7 +172,7 @@ while True:
     try:
         log("Tradable inventory: %s" % str([
             item["name"] for item in [
-                item for item in trading.get_inventory(settings["Authentication"]["userid"])
+                item for item in trading.get_inventory(session.cookies['user_id'])
                 if item["itemId"] not in trading.safeItems and
                 item["itemId"] not in trading.do_not_trade_away
             ]
@@ -251,7 +184,7 @@ while True:
             "Failed to load inventory of current user (probably due to Roblox throttling). Trying again soon.",
             mycolors.FAIL
         )
-        time.sleep(10)
+        time.sleep(30)
         tries += 1
         if tries >= 10:
             log("Failed to load inventory. Exiting.", mycolors.FAIL)
