@@ -95,18 +95,17 @@ def generate_value(item_id):
             url = f"https://economy.roblox.com/v1/assets/{resale_id}/resale-data"
 
         response = session.get(url)
-
         if response.status_code == 429:
-            log("Got too many requests. Waiting and trying again.", mycolors.WARNING)
-            time.sleep(5)
+            log("Got too many requests on resale-data, Waiting 15s and trying again.", mycolors.WARNING)
+            time.sleep(15)
             continue
         # NOTE: Handle new items that use the v2 API
         elif response.status_code == 400:
             log("Item uses new API retrying..", mycolors.WARNING)
             item_details = session.get(f"https://catalog.roblox.com/v1/catalog/items/{item_id}/details?itemType=asset")
             if item_details.status_code == 429:
-                log("Got too many requests. Waiting and trying again.", mycolors.WARNING)
-                time.sleep(5)
+                log("Got too many on item details requests. Waiting 15s and trying again.", mycolors.WARNING)
+                time.sleep(15)
                 continue
 
             if item_details.status_code != 200:
