@@ -5,8 +5,10 @@ import sys
 # Default config.ini file
 contents = """
 [General]
+ROBLOSECURITY = put your .roblosecurity here
+
 # https://www.youtube.com/watch?v=2SdEivsw8yA (This video shows how to get the Authenticator Secret at 0:25)
-Authenticator Code = enter auth code here
+authenticator_code = enter auth code here
 
 
 colors = false
@@ -19,20 +21,6 @@ switch_proxy_every_minutes = 10
 
 # You can put a discord webhook here and the bot will post when it sends a trade, accepts, or declines one.
 webhook_url = none
-
-[Authentication]
-# This is required. Please make sure you enter your Roblox user ID at https://olympian.xyz/ or else whitelist 
-# authentication will fail.
-userid = 1234567890
-
-# you can use either username/password auth or .roblosecurity
-# both are not required
-# you can leave 2fa enabled if you use .roblosecurity
-
-username = roblox username
-password = roblox password
-
-ROBLOSECURITY = put your .roblosecurity here
 
 [Trading]
 # If not set to false, then the bot will not send/accept/decline any trades or sell items.
