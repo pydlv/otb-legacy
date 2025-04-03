@@ -24,7 +24,7 @@ from settings import settings
 #################################################
 RELEASE = True
 
-VERSION = 56
+VERSION = 57
 #################################################
 
 if RELEASE:
@@ -65,7 +65,6 @@ def fetch_userid_and_name():
         Gets info on the current account to self class
     """
     auth_response = session.get("https://users.roblox.com/v1/users/authenticated")
-    print(auth_response.text, auth_response.cookies)
 
     if auth_response.status_code == 200: 
             return str(auth_response.json()['id']), auth_response.json()['name']
@@ -215,6 +214,7 @@ except IOError:
 last_rolimons_trade_ads_fetch = time.time() - 120
 
 def find_people():
+    print("trying to find people")
     global last_rolimons_trade_ads_fetch
 
     # Try to load state of previous session
@@ -230,9 +230,16 @@ def find_people():
         # Catalog
         try:
             # Search catalog for collectables
-            response = session.get("https://catalog.roblox.com/v1/search/items?"
-                                  "CatalogContext=1&Subcategory=2&SortType=0&SortAggregation=3&SortCurrency=0"
-                                  "&LegendExpanded=true&Category=2&limit=10&cursor=%s" % cursor)
+            # NOTE: Fuck roblox catalog API.
+            response = session.get("https://catalog.roblox.com/v1/search/items?category=Accessories&subcategory=Accessories&creatorName=Roblox&salesTypeFilter=2&sortType=1&limit=10")
+            # response = session.get("https://catalog.roblox.com/v1/search/items?"
+            #                       "CatalogContext=1&SortType=0&SortAggregation=3&SortCurrency=0"
+            #                       "&LegendExpanded=true&limit=10&cursor=%s" % cursor)
+
+            if response.status_code == 429:
+                log(f"Ratelimited getting collectables from catalog waiting 60 seconds and retrying")
+                time.sleep(60)
+                continue
 
             if response.status_code == 400 and "Invalid cursor" in response.text:
                 cursor = ""
@@ -257,6 +264,7 @@ def find_people():
                 response = session.get("https://economy.roblox.com/v1/assets/%i/resellers?limit=100&cursor="
                                         % item_id)
                 if response.status_code == 429:
+                    print("ratelimited trying to get resellers")
                     pass
                 else:
                     decoded_json = json.loads(response.text)
@@ -406,10 +414,11 @@ if settings["Trading"]["keep_items_on_sale"] == "true":
     saleManagerThread.daemon = True
     saleManagerThread.start()
 
-if settings["General"]["archive_trade_messages"] != "false":
-    tradeArchiverThread = threading.Thread(target=trade_message_archiver)
-    tradeArchiverThread.daemon = True
-    tradeArchiverThread.start()
+# NOTE: Roblox Changed this API pretty sure.
+# if settings["General"]["archive_trade_messages"] != "false":
+#     tradeArchiverThread = threading.Thread(target=trade_message_archiver)
+#     tradeArchiverThread.daemon = True
+#     tradeArchiverThread.start()
 
 if settings["Debugging"]["memory_debugging"] == "true":
     def memory_debug():
