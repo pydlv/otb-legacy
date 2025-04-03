@@ -185,7 +185,7 @@ while True:
             "Failed to load inventory of current user (probably due to Roblox throttling). Trying again soon.",
             mycolors.FAIL
         )
-        time.sleep(30)
+        time.sleep(10)
         tries += 1
         if tries >= 10:
             log("Failed to load inventory. Exiting.", mycolors.FAIL)
