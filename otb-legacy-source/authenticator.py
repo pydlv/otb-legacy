@@ -105,7 +105,7 @@ class AuthHandler:
             },
         )
 
-        log(f"continue auth response: {response.text}", mycolors.WARNING, no_log=True)
+        log(f"continue auth response: {response.text}", mycolors.WARNING, no_print=True)
 
     def validate_2fa(self, response, request_session):
         """
