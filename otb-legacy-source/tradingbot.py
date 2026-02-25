@@ -172,7 +172,10 @@ while True:
             log("Failed to load inventory. Exiting.", mycolors.FAIL)
             sys.exit(0)
     except trading.AllSelfItemsHoldException:
-        log("All items are on hold, waiting 30 minutes", mycolors.FAIL)
+        log(
+            "All items are on hold, waiting 30 minutes, then refreshing..",
+            mycolors.FAIL,
+        )
         logging.exception("All items are on hold, waiting 30 minutes.")
         time.sleep(1800)
 
