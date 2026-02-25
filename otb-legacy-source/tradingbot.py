@@ -13,13 +13,10 @@ from log import log
 from session import session
 from settings import settings
 
-# TODO: Wait 5 hrs if 100 trade limi
-# send webhok on waiting for trade hold
-
 #################################################
 RELEASE = True
 
-VERSION = 57
+VERSION = 57.5
 #################################################
 
 if RELEASE:
