@@ -1,6 +1,5 @@
 import copy
 import sys
-import os
 import itertools
 import json
 import logging
@@ -510,13 +509,15 @@ def send_trade(
                     "you are sending too many trade requests"
                     in response.json()["errors"][0]["message"].lower()
                 ):
+                    cooldowns.items_on_hold_event.set()
                     log(
-                        f"{session.cookies['username']} has hit the daily 100 trade limit exiting",
+                        f"{session.cookies['username']} has hit the daily 100 trade limit waiting 3 hours, then retrying",
                         mycolors.WARNING,
+                        post_to_webhook=True,
                     )
-                    os._exit(0)
-                    return "ratelimited"
-
+                    time.sleep(10800)
+                    cooldowns.items_on_hold_event.clear()
+                    return
             log(
                 "Trade with %i: Roblox is throttling us, waiting and trying again. Current cooldown is at %i."
                 % (user_id, trade_cooldown_time),
@@ -549,7 +550,10 @@ def send_trade(
                         # stop the on_hold event
                         cooldowns.items_on_hold_event.clear()
                         break
-                    log("All items on hold, waiting 30 minutes, then refreshing...")
+                    log(
+                        "All items on hold, waiting 30 minutes, then refreshing...",
+                        post_to_webhook=True,
+                    )
                     time.sleep(1800)
     else:
         log("Trade sent successfully.", mycolors.OKGREEN)
