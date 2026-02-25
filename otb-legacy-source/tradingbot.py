@@ -220,7 +220,7 @@ def find_people():
         try:
             # Search catalog for collectables
             response = session.get(
-                "https://catalog.roblox.com/v1/search/items?category=Accessories&subcategory=Accessories&creatorName=Roblox&salesTypeFilter=2&sortType=1&limit=10"
+                f"https://catalog.roblox.com/v1/search/items?category=Accessories&subcategory=Accessories&creatorName=Roblox&salesTypeFilter=2&sortType=1&limit=10&cursor={cursor}"
             )
 
             if response.status_code == 429:
