@@ -30,7 +30,7 @@ class AuthHandler:
         except ValueError:
             return False
         except Exception as e:
-            log("error for verify auth", e)
+            log(f"error for verify auth {e}")
             return False
 
         return totp
@@ -59,12 +59,12 @@ class AuthHandler:
 
             if "errors" in request.json():
                 if request.status_code == 429:
-                    log("Waiting 75 seconds for 2fa ratelimit", request.text)
+                    log(f"Waiting 75 seconds for 2fa ratelimit {request.text}")
                     time.sleep(75)
                     continue
 
                 log("2fa error, waiting 120 seconds")
-                log(request.json(), "FOR USER:", user_Id)
+                log(f"{request.json()} FOR USER: {user_Id}")
                 time.sleep(120)
                 # input(request.json()["errors"][0]["message"])
                 return False
@@ -120,24 +120,14 @@ class AuthHandler:
             metadata_challengeid = metadata["challengeId"]
         except Exception:
             log(
-                "couldnt get meta data challengeid from",
-                metadata,
-                "scraping from",
-                response.headers,
-                "for meta data",
-                response.url,
+                f"couldnt get meta data challengeid from {metadata} scraping from {response.headers} for metadata {response.url}"
             )
             return False
         try:
             senderid = metadata["userId"]
         except Exception:
             log(
-                "couldnt get userid from",
-                metadata,
-                "scraping from",
-                response.headers,
-                "for meta data",
-                response.url,
+                f"couldnt get meta data challengeid from {metadata} scraping from {response.headers} for metadata {response.url}"
             )
             return False
 
