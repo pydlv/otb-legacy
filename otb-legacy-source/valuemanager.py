@@ -1,8 +1,7 @@
-from datetime import datetime, timedelta
-
+from datetime import datetime
+import sys
 import json
 import time
-
 import mycolors
 from log import log
 from session import session
@@ -16,7 +15,9 @@ try:
 except IOError:
     data = None
 
-identifier = "old" if settings["Trading"]["use_old_value_algorithm"] == "true" else "new"
+identifier = (
+    "old" if settings["Trading"]["use_old_value_algorithm"] == "true" else "new"
+)
 
 if data:
     lines = data.split("\n")
@@ -31,7 +32,7 @@ if data:
                     "value": float(parts[1]),
                     "volume": float(parts[2]),
                     "timestamp": int(parts[3]),
-                    "age": float(parts[4])
+                    "age": float(parts[4]),
                 }
 
 
@@ -42,43 +43,56 @@ def median(lst):
     if n % 2 == 1:
         return sorted(lst)[n // 2]
     else:
-        return sum(sorted(lst)[n // 2 - 1:n // 2 + 1]) / 2.0
+        return sum(sorted(lst)[n // 2 - 1 : n // 2 + 1]) / 2.0
 
 
 def write_value(item_id, value, volume, age):
-    values[item_id] = {"value": float(value), "volume": float(volume), "timestamp": int(time.time()), "age": age}
+    values[item_id] = {
+        "value": float(value),
+        "volume": float(volume),
+        "timestamp": int(time.time()),
+        "age": age,
+    }
 
     compiled_str = "%s\n" % identifier
     for key in values:
         value = values[key]
-        compiled_str += "\n%i:%i:%f:%i:%f" % (key, value["value"], value["volume"], value["timestamp"], value["age"])
+        compiled_str += "\n%i:%i:%f:%i:%f" % (
+            key,
+            value["value"],
+            value["volume"],
+            value["timestamp"],
+            value["age"],
+        )
 
     with open("values", "w") as f:
         f.write(compiled_str)
+
 
 # NOTE: More dynamic for parsing dates, because the v1 and v2 API dates are different formats? (goodjob roblox)
 def parse_date(date_str):
     # Define the possible time formats
     time_formats = [
-        "%Y-%m-%dT%H:%M:%SZ",       # Format with 'Z' (UTC indicator)
-        "%Y-%m-%dT%H:%M:%S.%fZ",    # Format with fractional seconds and 'Z'
-        "%Y-%m-%dT%H:%M:%S.%f",     # Format with fractional seconds, no 'Z'
+        "%Y-%m-%dT%H:%M:%SZ",  # Format with 'Z' (UTC indicator)
+        "%Y-%m-%dT%H:%M:%S.%fZ",  # Format with fractional seconds and 'Z'
+        "%Y-%m-%dT%H:%M:%S.%f",  # Format with fractional seconds, no 'Z'
     ]
 
     # Check if there is a '.' to handle microsecond truncation
-    if '.' in date_str:
-        date_str = date_str.split('.')[0] + '.' + date_str.split('.')[1][:6]  # Ensures only 6 digits for microseconds
+    if "." in date_str:
+        date_str = (
+            date_str.split(".")[0] + "." + date_str.split(".")[1][:6]
+        )  # Ensures only 6 digits for microseconds
 
     for time_format in time_formats:
         try:
             return datetime.strptime(date_str, time_format)
         except ValueError:
-            continue      
+            continue
 
     # Return None if all formats fail
 
     return None
-
 
 
 def generate_value(item_id):
@@ -86,25 +100,33 @@ def generate_value(item_id):
 
     decoded = None
 
-    #NOTE: these are set so we can use both V1 and V2 APIs without changing item id or url
+    # NOTE: these are set so we can use both V1 and V2 APIs without changing item id or url
     url = None
     resale_id = item_id
     while True:
         # NOTE: Assume the URL is the v1 API (all older items)
-        if url == None:
+        if url is None:
             url = f"https://economy.roblox.com/v1/assets/{resale_id}/resale-data"
 
         response = session.get(url)
         if response.status_code == 429:
-            log("Got too many requests on resale-data, Waiting 15s and trying again.", mycolors.WARNING)
+            log(
+                "Got too many requests on resale-data, Waiting 15s and trying again.",
+                mycolors.WARNING,
+            )
             time.sleep(15)
             continue
         # NOTE: Handle new items that use the v2 API
         elif response.status_code == 400:
             log("Item uses new API retrying..", mycolors.WARNING)
-            item_details = session.get(f"https://catalog.roblox.com/v1/catalog/items/{item_id}/details?itemType=asset")
+            item_details = session.get(
+                f"https://catalog.roblox.com/v1/catalog/items/{item_id}/details?itemType=asset"
+            )
             if item_details.status_code == 429:
-                log("Got too many on item details requests. Waiting 15s and trying again.", mycolors.WARNING)
+                log(
+                    "Got too many on item details requests. Waiting 15s and trying again.",
+                    mycolors.WARNING,
+                )
                 time.sleep(15)
                 continue
 
@@ -115,7 +137,7 @@ def generate_value(item_id):
 
             detail_data = item_details.json()
             if "collectibleItemId" in detail_data:
-                resale_id = detail_data['collectibleItemId']
+                resale_id = detail_data["collectibleItemId"]
                 url = f"https://apis.roblox.com/marketplace-sales/v1/item/{resale_id}/resale-data"
 
             continue
@@ -130,7 +152,12 @@ def generate_value(item_id):
             timestamp = time.mktime(dt.timetuple())
             value = item["value"]
 
-            result.append((int(timestamp), value, ))
+            result.append(
+                (
+                    int(timestamp),
+                    value,
+                )
+            )
 
         return result
 
@@ -156,7 +183,12 @@ def generate_value(item_id):
             age = 0
 
         if not len(sales_data) or not len(volume_data):
-            values[item_id] = {"value": 0.0, "volume": 0.0, "timestamp": now, "age": age}
+            values[item_id] = {
+                "value": 0.0,
+                "volume": 0.0,
+                "timestamp": now,
+                "age": age,
+            }
             write_value(item_id, 0.0, 0.0, age)
             return values[item_id]
 
@@ -165,7 +197,12 @@ def generate_value(item_id):
 
         final_volume = (volume_median * volume_length) / 119
 
-        values[item_id] = {"value": float(sales_median), "volume": float(final_volume), "timestamp": now, "age": age}
+        values[item_id] = {
+            "value": float(sales_median),
+            "volume": float(final_volume),
+            "timestamp": now,
+            "age": age,
+        }
 
         write_value(item_id, float(sales_median), float(final_volume), age)
 
@@ -253,7 +290,11 @@ def generate_value(item_id):
         avg2 = (averages[1] + averages[2]) / 2.0
         avg3 = (averages[0] + averages[2]) / 2.0
 
-        if abs(averages[2] - avg1) > avg1 and abs(averages[0] - avg2) > avg2 and abs(averages[1] - avg3) > avg3:
+        if (
+            abs(averages[2] - avg1) > avg1
+            and abs(averages[0] - avg2) > avg2
+            and abs(averages[1] - avg3) > avg3
+        ):
             sales_lows = []
         elif abs(averages[2] - avg1) > avg1:
             sales_lows = sale_thirds[0] + sale_thirds[1]
@@ -270,7 +311,9 @@ def generate_value(item_id):
             volume_thirds.append([])
 
         if len(volume_candles) > 0:
-            volume_time_range = volume_candles[len(volume_candles) - 1][0] - volume_candles[0][0]
+            volume_time_range = (
+                volume_candles[len(volume_candles) - 1][0] - volume_candles[0][0]
+            )
 
             one_third = volume_time_range / 3.0
             first_start = volume_candles[0][0]
@@ -302,7 +345,11 @@ def generate_value(item_id):
         avg3 = (averages[0] + averages[2]) / 2.0
 
         # Number of days that we divide by
-        if abs(averages[2] - avg1) > avg1 and abs(averages[0] - avg2) > avg2 and abs(averages[1] - avg3) > avg3:
+        if (
+            abs(averages[2] - avg1) > avg1
+            and abs(averages[0] - avg2) > avg2
+            and abs(averages[1] - avg3) > avg3
+        ):
             divisor = 0.0
             volume_candles = []
         elif abs(averages[2] - avg1) > avg1:
@@ -337,7 +384,12 @@ def generate_value(item_id):
         except ZeroDivisionError:
             volume_average = 0
 
-        values[item_id] = {"value": float(low_average), "volume": float(volume_average), "timestamp": now, "age": age}
+        values[item_id] = {
+            "value": float(low_average),
+            "volume": float(volume_average),
+            "timestamp": now,
+            "age": age,
+        }
 
         write_value(item_id, float(low_average), float(volume_average), age)
 

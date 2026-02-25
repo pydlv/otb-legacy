@@ -36,7 +36,10 @@ def is_user_ready(user_id):
     if user_id not in cooldowns:
         return True
 
-    if cooldowns[user_id] + int(settings["Trading"]["minimum_trade_partner_cooldown"]) <= time.time():
+    if (
+        cooldowns[user_id] + int(settings["Trading"]["minimum_trade_partner_cooldown"])
+        <= time.time()
+    ):
         del cooldowns[user_id]
         return True
     else:
@@ -49,7 +52,10 @@ def add_cooldown(user_id):
     now = time.time()
     # Perform some cleanup to prevent data size from bloating
     for key in cooldowns.keys():
-        if cooldowns[key] + int(settings["Trading"]["minimum_trade_partner_cooldown"]) <= now:
+        if (
+            cooldowns[key] + int(settings["Trading"]["minimum_trade_partner_cooldown"])
+            <= now
+        ):
             del cooldowns[key]
 
     cooldowns[user_id] = now

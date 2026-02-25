@@ -1,5 +1,4 @@
 from bs4 import BeautifulSoup
-
 import mycolors
 from log import log
 from session import session
@@ -39,7 +38,7 @@ def generate_type(item_id):
             "Accessory | Shoulder",
             "Accessory | Front",
             "Accessory | Back",
-            "Accessory | Waist"
+            "Accessory | Waist",
         ]
         if elem.text in hat_types:
             the_type = 1

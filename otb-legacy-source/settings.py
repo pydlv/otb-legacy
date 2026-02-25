@@ -167,7 +167,6 @@ memory_debugging = false
 """
 
 
-
 try:
     with open("config.ini", "r") as f:
         f.read()
@@ -187,6 +186,7 @@ config = configparser.ConfigParser()
 config.read("config.ini")
 sections = config.sections()
 
+
 def config_section_map(c, section):
     dict1 = {}
     options = c.options(section)
@@ -198,6 +198,7 @@ def config_section_map(c, section):
         except (ValueError, TypeError):
             dict1[option] = None
     return dict1
+
 
 settings = {}
 
@@ -229,4 +230,3 @@ for section in sections:
 if updated:
     with open("config.ini", "w") as f:
         config.write(f)
-

@@ -31,18 +31,18 @@ class Proxy(object):
 
     def format(self):
         if self.username or self.password:
-            return ("%s:%s@%s:%s" % (self.username, self.password, self.host, self.port))
+            return "%s:%s@%s:%s" % (self.username, self.password, self.host, self.port)
         else:
-            return ("%s:%s" % (self.host, self.port))
+            return "%s:%s" % (self.host, self.port)
 
 
 def parse_proxy(line):
-    match = re.match(r'([\d\w.]+):([\d\w.]+)@([\d\w.]+):([\d\w.]+)', line)
+    match = re.match(r"([\d\w.]+):([\d\w.]+)@([\d\w.]+):([\d\w.]+)", line)
     if match:
         groups = match.groups()
         return Proxy(groups[2], groups[3], groups[0], groups[1])
 
-    match = re.match(r'([\d\w.]+):([\d\w.]+)(?::([\d\w.]+):([\d\w.]+))?', line)
+    match = re.match(r"([\d\w.]+):([\d\w.]+)(?::([\d\w.]+):([\d\w.]+))?", line)
     if match:
         groups = match.groups()
         return Proxy(*groups)
@@ -69,7 +69,8 @@ def infinite_loop_proxies():
             yield proxy
 
 
-switch_proxy_every_minutes = int(settings['General']['switch_proxy_every_minutes'])
+switch_proxy_every_minutes = int(
+    settings["General"]["switch_proxy_every_minutes"])
 
 
 def test_proxy():
@@ -89,14 +90,11 @@ def next_proxy():
     http_proxy = "http://" + next_proxy.format()
     https_proxy = "https://" + next_proxy.format()
 
-    os.environ['HTTP_PROXY'] = os.environ['http_proxy'] = http_proxy
-    os.environ['HTTPS_PROXY'] = os.environ['https_proxy'] = https_proxy
-    os.environ['NO_PROXY'] = os.environ['no_proxy'] = '127.0.0.1,localhost,.local'
+    os.environ["HTTP_PROXY"] = os.environ["http_proxy"] = http_proxy
+    os.environ["HTTPS_PROXY"] = os.environ["https_proxy"] = https_proxy
+    os.environ["NO_PROXY"] = os.environ["no_proxy"] = "127.0.0.1,localhost,.local"
 
-    session.proxies = {
-        "http": http_proxy,
-        "https": https_proxy
-    }
+    session.proxies = {"http": http_proxy, "https": https_proxy}
 
     # test_proxy()
 
