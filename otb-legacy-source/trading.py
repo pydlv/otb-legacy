@@ -951,9 +951,7 @@ def update_score_threshold():
             except ZeroDivisionError:
                 return
 
-        def clamp(x):
-            """Clamp a number to be at least 0.001."""
-            return max(x, 0.001)
+        clamp = lambda x: max(x, 0.001)
 
         try:
             percent_diff = abs(
@@ -1194,8 +1192,8 @@ def search_for_trades(user_id, guarantee_trade=False):
             random.shuffle(nums)
             random.shuffle(lengths)
 
-        for len in lengths:
-            result = itertools.combinations(nums, len)
+        for l in lengths:
+            result = itertools.combinations(nums, l)
             for combo in result:
                 yield combo
 
@@ -1205,11 +1203,11 @@ def search_for_trades(user_id, guarantee_trade=False):
                 yield x, y
 
     my_combos = combos(len(my_inventory), int(settings["Trading"]["maximum_xv1"]))
+    their_combos_wrapper = lambda: combos(
+        len(their_inventory), int(settings["Trading"]["maximum_1vx"])
+    )
 
-    def their_combos_wrapper(their_inventory, settings):
-        return combos(len(their_inventory), int(settings["Trading"]["maximum_1vx"]))
-
-    combinations = prod(my_combos, their_combos_wrapper(their_inventory, settings))
+    combinations = prod(my_combos, their_combos_wrapper)
 
     good_combinations = []
     for i, indexCombo in enumerate(combinations):
