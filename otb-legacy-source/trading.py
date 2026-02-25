@@ -536,6 +536,14 @@ def send_trade(
                 )
             if "userAssets are invalid" in error_output_text:
                 remove_trades_with_invalid_items_from_queue()
+            if "One or more UserAssets are on hold" in error_output_text:
+                while True:
+                    remove_trades_with_invalid_items_from_queue()
+                    if len(get_inventory(session.cookies["user_id"])) <= 0:
+                        log("All items on hold, waiting 30 minutes, then refreshing...")
+                        time.sleep(1800)
+                    else:
+                        break
     else:
         log("Trade sent successfully.", mycolors.OKGREEN)
 
