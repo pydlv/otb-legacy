@@ -267,7 +267,7 @@ def get_inventory(user_id):
         item
         for item in inventory
         if item["value"] <= int(settings["Trading"]["maximum_item_value"])
-        and item["isOnHold"] == False
+        and not item["isOnHold"]
     ]
 
     return inventory
