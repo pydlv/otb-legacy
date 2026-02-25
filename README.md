@@ -8,7 +8,7 @@ https://olympian.xyz
 
 ## Steps
 > [!NOTE]
-> Install Python and make sure it's in your PATH. Compatible with **Python 3.13+**.
+> Install Python and make sure it's in your PATH. Compatible with atleast **Python 3.13**.
 
 
 Launch Command Prompt, PowerShell, or Terminal and navigate to the root folder of the project. `otb-legacy`
