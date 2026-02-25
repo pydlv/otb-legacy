@@ -24,7 +24,7 @@ pip install -r requirements.txt
 python otb-legacy-source/tradingbot.py
 ```
 
-**2. Edit the config**
+**3. Edit the config**
 
 Open `config.ini` and fill in your cookie and 2FA secret code.
 
