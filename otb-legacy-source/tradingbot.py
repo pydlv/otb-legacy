@@ -1,3 +1,4 @@
+import traceback
 import json
 import logging
 import sys
@@ -114,8 +115,7 @@ if get_is_logged_in_and_run_privacy_checks():
     log("Login successful with .ROBLOSECURITY.", mycolors.OKBLUE)
 else:
     log(
-        "Failed to login with .ROBLOSECURITY.\n\nMake sure 2-factor authentication is off, "
-        "or provide a valid .ROBLOSECURITY cookie.",
+        "Failed to login with .ROBLOSECURITY.\n\nMake sure your cookie isnt expired.",
         mycolors.FAIL,
     )
     sys.exit(0)
@@ -145,21 +145,20 @@ log("Loading current inventory...", mycolors.OKBLUE)
 tries = 0
 while True:
     try:
-        log(
-            "Tradable inventory: %s"
-            % str(
-                [
-                    item["name"]
-                    for item in [
-                        item
-                        for item in trading.get_inventory(session.cookies["user_id"])
-                        if item["itemId"] not in trading.safeItems
-                        and item["itemId"] not in trading.do_not_trade_away
-                    ]
-                ]
-            ),
-            mycolors.OKBLUE,
-        )
+        tradable_items = [
+            item["name"]
+            for item in [
+                item
+                for item in trading.get_inventory(session.cookies["user_id"])
+                if item["itemId"] not in trading.safeItems
+                and item["itemId"] not in trading.do_not_trade_away
+            ]
+        ]
+
+        log(f"Tradable inventory: {tradable_items}", mycolors.OKBLUE)
+
+        if len(tradable_items) >= 0:
+            raise trading.AllSelfItemsHoldException
         break
     except trading.FailedToLoadInventoryException:
         logging.exception("Caught exception while trying to load user inventory.")
@@ -172,6 +171,11 @@ while True:
         if tries >= 10:
             log("Failed to load inventory. Exiting.", mycolors.FAIL)
             sys.exit(0)
+    except trading.AllSelfItemsHoldException:
+        log("All items are on hold, waiting 30 minutes", mycolors.FAIL)
+        logging.exception("All items are on hold, waiting 30 minutes.")
+        time.sleep(1800)
+
 
 log("Item IDs not to trade: %s" % str(trading.safeItems), mycolors.OKBLUE)
 
@@ -220,9 +224,8 @@ def find_people():
         try:
             # Search catalog for collectables
             response = session.get(
-                f"https://catalog.roblox.com/v1/search/items?category=Accessories&subcategory=Accessories&creatorName=Roblox&salesTypeFilter=2&sortType=1&limit=10&cursor={cursor}"
+                f"https://catalog.roblox.com/v2/search/items/details?taxonomy=wNYJso48d1XnhMyFWT3oX3&creatorName=ROBLOX&salesTypeFilter=2&sortType=1&limit=10&cursor={cursor}"
             )
-
             if response.status_code == 429:
                 log(
                     "Ratelimited getting collectables from catalog waiting 60 seconds and retrying"
@@ -252,14 +255,12 @@ def find_people():
                 f.write(str(cursor))
 
             for item in decoded_response["data"]:
-                item_id = item["id"]
+                item_id = item["collectibleItemId"]
                 response = session.get(
-                    "https://economy.roblox.com/v1/assets/%i/resellers?limit=100&cursor="
-                    % item_id
+                    f"https://apis.roblox.com/marketplace-sales/v1/item/{item_id}/resellers?cursor=&limit=100&cursor="
                 )
                 if response.status_code == 429:
                     print("ratelimited trying to get resellers")
-                    pass
                 else:
                     decoded_json = json.loads(response.text)
 
@@ -279,7 +280,8 @@ def find_people():
                             )
                     else:
                         seller_ids = [
-                            result["seller"]["id"] for result in decoded_json["data"]
+                            result["seller"]["sellerId"]
+                            for result in decoded_json["data"]
                         ]
 
                         for sellerId in seller_ids:
@@ -292,8 +294,7 @@ def find_people():
 
                 # Find IDs from item owners
                 response = session.get(
-                    "https://inventory.roblox.com/v2/assets/%i/owners?sortOrder=Desc&limit=100"
-                    % item_id
+                    f"https://inventory.roblox.com/v2/assets/{item_id}/owners?sortOrder=Desc&limit=100"
                 )
                 if response.status_code == 429 or response.status_code == 503:
                     log(
@@ -319,9 +320,9 @@ def find_people():
                         and cooldowns.is_user_ready(ownerId)
                     ):
                         item_owner_ids.add(ownerId)
-        except Exception:
-            log("Caught exception while searching catalog.", mycolors.FAIL)
-            logging.exception("Caught exception while searching catalog.")
+        except Exception as error:
+            log(f"Caught exception while searching catalog. {error}", mycolors.FAIL)
+            logging.exception(f"Caught exception while searching catalog. {error}")
 
         # Get from rolimon trade ads
         # We are rate limiting to once per two minutes. Per rolimons devs this page contains ads from the last 3 minutes
@@ -340,22 +341,23 @@ def find_people():
                         trade_ad_ids.add(i)
 
                 last_rolimons_trade_ads_fetch = time.time()
-        except Exception:
-            log("Caught exception while doing thing.", mycolors.FAIL)
-            logging.exception("Caught exception while doing thing.")
+        except Exception as error:
+            log(f"Caught exception while doing thing. {error}", mycolors.FAIL)
+            logging.exception(f"Caught exception while doing thing. {error}")
 
         # Trade group
+        # NOTE: This is now scans a knock-off trade group as group walls got removed.
         try:
             response = session.get(
-                "https://groups.roblox.com/v2/groups/650266/wall/posts?cursor=&limit=50&sortOrder=Desc"
+                "https://groups.roblox.com/v1/groups/598411/forums/6877cf36-b844-488a-bb4d-32abccbf3d7e/posts?includeCommentCount=true&limit=10"
             )
 
-            if response.status_code == 429:
+            if response.status_code == 429 or response.status_code == 403:
                 # We're sending too many requests, so just skip this one for now
                 pass
             else:
                 found_ids = [
-                    datum["poster"]["user"]["userId"]
+                    datum["firstComment"]["createdBy"]
                     for datum in json.loads(response.text)["data"]
                 ]
 
@@ -366,13 +368,13 @@ def find_people():
                         and cooldowns.is_user_ready(found_id)
                     ):
                         trade_group_ids.add(found_id)
-        except Exception:
+        except Exception as error:
             log(
-                "Caught exception while searching Trade. group for trade partners.",
+                f"Caught exception while searching Trade. group for trade partners. {error}",
                 mycolors.FAIL,
             )
             logging.exception(
-                "Caught exception while searching Trade. group for trade partners."
+                f"Caught exception while searching Trade. group for trade partners. {error}"
             )
 
         while True:
@@ -531,7 +533,8 @@ while True:
                 time.sleep(1)
             else:
                 time.sleep(1)
-        except Exception:
-            log("Caught exception in main trading loop.", mycolors.FAIL)
-            logging.exception("Caught exception in main trading loop.")
+        except Exception as error:
+            tb = traceback.format_exc()
+            log(f"Caught exception in main trading loop.\n{tb}", mycolors.FAIL)
+            logging.exception(f"Caught exception in main trading loop. {error}")
             continue
