@@ -190,6 +190,10 @@ class FailedToLoadInventoryException(Exception):
     pass
 
 
+class AllSelfItemsHoldException(Exception):
+    pass
+
+
 @cached(cache=TTLCache(maxsize=4096, ttl=300))
 def get_inventory(user_id):
     user_id = int(user_id)
@@ -263,7 +267,7 @@ def get_inventory(user_id):
         item
         for item in inventory
         if item["value"] <= int(settings["Trading"]["maximum_item_value"])
-        and item["isOnHold"]
+        and not item["isOnHold"]
     ]
 
     return inventory
