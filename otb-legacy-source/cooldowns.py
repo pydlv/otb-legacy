@@ -54,12 +54,12 @@ def add_cooldown(user_id):
 
     now = time.time()
     # Perform some cleanup to prevent data size from bloating
-    for key in cooldowns.keys():
-        if (
-            cooldowns[key] + int(settings["Trading"]["minimum_trade_partner_cooldown"])
-            <= now
-        ):
-            del cooldowns[key]
+    min_cooldown = int(settings["Trading"]["minimum_trade_partner_cooldown"])
+    cooldowns = {
+        partner: last_traded
+        for partner, last_traded in cooldowns.items()
+        if last_traded + min_cooldown > now
+    }
 
     cooldowns[user_id] = now
 
