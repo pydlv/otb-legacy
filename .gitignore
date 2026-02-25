@@ -45,6 +45,7 @@ Thumbs.db
 *.pyc
 *.ini
 values
+*proxies*
 
 # Folders #
 ###########
