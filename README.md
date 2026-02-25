@@ -27,6 +27,6 @@ python otb-legacy-source/tradingbot.py
 
 **4. Edit the config**
 
-Open `otb-legacy-source/config.ini` and fill in your cookie and 2FA secret code.
+Open `config.ini` and fill in your cookie and 2FA secret code.
 
 Then repeat step number #3 and it will start trading!
