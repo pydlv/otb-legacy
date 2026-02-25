@@ -30,7 +30,7 @@ class AuthHandler:
         except ValueError:
             return False
         except Exception as e:
-            print("error for verify auth", e)
+            log("error for verify auth", e)
             return False
 
         return totp
@@ -59,19 +59,19 @@ class AuthHandler:
 
             if "errors" in request.json():
                 if request.status_code == 429:
-                    print("Waiting 75 seconds for 2fa ratelimit", request.text)
+                    log("Waiting 75 seconds for 2fa ratelimit", request.text)
                     time.sleep(75)
                     continue
 
-                print("2fa error, waiting 120 seconds")
-                print(request.json(), "FOR USER:", user_Id)
+                log("2fa error, waiting 120 seconds")
+                log(request.json(), "FOR USER:", user_Id)
                 time.sleep(120)
                 # input(request.json()["errors"][0]["message"])
                 return False
             try:
                 return request.json()["verificationToken"]
             except Exception:
-                print(
+                log(
                     "error returning verification token",
                     request.text,
                     request.status_code,
@@ -105,7 +105,7 @@ class AuthHandler:
             },
         )
 
-        log(f"continue auth response: {response.text}", mycolors.WARNING, no_print=True)
+        log(f"continue auth response: {response.text}", mycolors.WARNING, no_log=True)
 
     def validate_2fa(self, response, request_session):
         """
@@ -119,7 +119,7 @@ class AuthHandler:
         try:
             metadata_challengeid = metadata["challengeId"]
         except Exception:
-            print(
+            log(
                 "couldnt get meta data challengeid from",
                 metadata,
                 "scraping from",
@@ -131,7 +131,7 @@ class AuthHandler:
         try:
             senderid = metadata["userId"]
         except Exception:
-            print(
+            log(
                 "couldnt get userid from",
                 metadata,
                 "scraping from",
