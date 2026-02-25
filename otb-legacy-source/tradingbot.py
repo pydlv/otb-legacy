@@ -13,6 +13,9 @@ from log import log
 from session import session
 from settings import settings
 
+# TODO: Wait 5 hrs if 100 trade limi
+# send webhok on waiting for trade hold
+
 #################################################
 RELEASE = True
 
@@ -157,7 +160,7 @@ while True:
 
         log(f"Tradable inventory: {tradable_items}", mycolors.OKBLUE)
 
-        if len(tradable_items) >= 0:
+        if len(tradable_items) <= 0:
             raise trading.AllSelfItemsHoldException
         break
     except trading.FailedToLoadInventoryException:
