@@ -441,6 +441,9 @@ def remove_trades_with_invalid_items_from_queue():
     trade_queue_insertion_timestamps = []
 
 
+on_trade_hold = False
+
+
 def send_trade(
     user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_repeat=False
 ):
@@ -537,13 +540,17 @@ def send_trade(
             if "userAssets are invalid" in error_output_text:
                 remove_trades_with_invalid_items_from_queue()
             if "One or more UserAssets are on hold" in error_output_text:
+                # Set the hold_event to stop the searching for players to pause
+                cooldowns.items_on_hold_event.set()
+
                 while True:
                     remove_trades_with_invalid_items_from_queue()
-                    if len(get_inventory(session.cookies["user_id"])) <= 0:
-                        log("All items on hold, waiting 30 minutes, then refreshing...")
-                        time.sleep(1800)
-                    else:
+                    if len(get_inventory(session.cookies["user_id"])) > 0:
+                        # stop the on_hold event
+                        cooldowns.items_on_hold_event.clear()
                         break
+                    log("All items on hold, waiting 30 minutes, then refreshing...")
+                    time.sleep(1800)
     else:
         log("Trade sent successfully.", mycolors.OKGREEN)
 
@@ -1039,8 +1046,8 @@ def trade_send_queue_runner():
                 send_trade(trade[0], trade[1])
 
             time.sleep(1)
-        except Exception:
-            log("Caught exception in trade sending loop.", mycolors.FAIL)
+        except Exception as error:
+            log(f"Caught exception in trade sending loop: {error}", mycolors.FAIL)
             logging.exception("Caught exception in trade sending loop.")
             continue
 

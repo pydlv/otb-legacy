@@ -1,7 +1,10 @@
+import threading
 import time
 from settings import settings
 
 cooldowns = {}
+# For holding threads incase of all items are being held
+items_on_hold_event = threading.Event()
 
 
 def load_cooldowns():

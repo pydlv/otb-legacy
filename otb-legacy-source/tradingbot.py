@@ -223,6 +223,11 @@ def find_people():
             f.write("")
 
     while True:
+        # Check if items are on hold:
+        if cooldowns.items_on_hold_event.is_set():
+            time.sleep(60)
+            continue
+
         # Catalog
         try:
             # Search catalog for collectables
@@ -451,7 +456,18 @@ def trade_message_archiver():
             continue
 
 
-idFinderThread = threading.Thread(target=find_people)
+def find_people_with_pause():
+    while True:
+        if cooldowns.items_on_hold_event.is_set():
+            log("waiting for items to get off hold")
+
+            # Wait until its off
+            time.sleep(60)
+            continue
+        find_people()
+
+
+idFinderThread = threading.Thread(target=find_people_with_pause)
 idFinderThread.daemon = True
 idFinderThread.start()
 
