@@ -216,7 +216,7 @@ def find_people():
     # Try to load state of previous session
     try:
         with open(".page", "r") as f:
-            cursor = int(f.read())
+            cursor = str(f.read())
     except (IOError, ValueError):
         cursor = ""
         with open(".page", "w") as f:
@@ -265,7 +265,7 @@ def find_people():
             for item in decoded_response["data"]:
                 item_id = item["collectibleItemId"]
                 response = session.get(
-                    f"https://apis.roblox.com/marketplace-sales/v1/item/{item_id}/resellers?cursor=&limit=100&cursor="
+                    f"https://apis.roblox.com/marketplace-sales/v1/item/{item_id}/resellers?cursor=&limit=100"
                 )
                 if response.status_code == 429:
                     print("ratelimited trying to get resellers")
