@@ -1,7 +1,10 @@
+import threading
 import time
 from settings import settings
 
 cooldowns = {}
+# For holding threads incase of all items are being held
+items_on_hold_event = threading.Event()
 
 
 def load_cooldowns():
@@ -36,7 +39,10 @@ def is_user_ready(user_id):
     if user_id not in cooldowns:
         return True
 
-    if cooldowns[user_id] + int(settings["Trading"]["minimum_trade_partner_cooldown"]) <= time.time():
+    if (
+        cooldowns[user_id] + int(settings["Trading"]["minimum_trade_partner_cooldown"])
+        <= time.time()
+    ):
         del cooldowns[user_id]
         return True
     else:
@@ -48,9 +54,12 @@ def add_cooldown(user_id):
 
     now = time.time()
     # Perform some cleanup to prevent data size from bloating
-    for key in cooldowns.keys():
-        if cooldowns[key] + int(settings["Trading"]["minimum_trade_partner_cooldown"]) <= now:
-            del cooldowns[key]
+    min_cooldown = int(settings["Trading"]["minimum_trade_partner_cooldown"])
+    cooldowns = {
+        partner: last_traded
+        for partner, last_traded in cooldowns.items()
+        if last_traded + min_cooldown > now
+    }
 
     cooldowns[user_id] = now
 

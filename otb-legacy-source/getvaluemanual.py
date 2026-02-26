@@ -1,8 +1,8 @@
 import os
+import sys
+import valuemanager
 
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
-
-import sys
 
 sys.path.append("./Lib")
 sys.path.append("./DLLs")
@@ -11,8 +11,6 @@ sys.path.append("./Lib/lib-tk")
 sys.path.append("./Lib/site-packages")
 sys.path.append("./Lib/site-packages/requests/packages")
 sys.path.append("C:/Python27/Lib/site-packages")
-
-import valuemanager
 
 
 def calculate_volume(value, volume):
@@ -24,7 +22,8 @@ while True:
 
     item = valuemanager.generate_value(int(theId))
     try:
-        item["ModifiedVolume"] = calculate_volume(item["value"], item["volume"])
+        item["ModifiedVolume"] = calculate_volume(
+            item["value"], item["volume"])
     except ZeroDivisionError:
         item["ModifiedVolume"] = 0.0
 

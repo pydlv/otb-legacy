@@ -20,9 +20,11 @@ def populate_no_trade():
 
     start_index = 0
     while True:
-        request = session.post("https://www.roblox.com/my/money.aspx/getmyitemtrades",
-                               headers={"Content-Type": "application/json"},
-                               data='{"statustype":"outbound","startindex":%i}' % start_index)
+        request = session.post(
+            "https://www.roblox.com/my/money.aspx/getmyitemtrades",
+            headers={"Content-Type": "application/json"},
+            data='{"statustype":"outbound","startindex":%i}' % start_index,
+        )
         response = request.text
 
         outbound_json_raw = json.loads(response)

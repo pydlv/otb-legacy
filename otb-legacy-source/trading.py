@@ -1,6 +1,5 @@
 import copy
 import sys
-import os
 import itertools
 import json
 import logging
@@ -67,22 +66,32 @@ for part in parts:
 Authenticator = AuthHandler(settings["General"]["authenticator_code"])
 
 trade_cooldown_time = float(settings["Trading"]["minimum_time_between_trades"])
-auto_adjust_time_between_trades = settings["Trading"]["auto_adjust_time_between_trades"] == "true"
+auto_adjust_time_between_trades = (
+    settings["Trading"]["auto_adjust_time_between_trades"] == "true"
+)
 
 if settings["Trading"]["max_weighted_item_volume_slippage_allowance"] != "none":
-    MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE = float(settings["Trading"]["max_weighted_item_volume_slippage_allowance"])
+    MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE = float(
+        settings["Trading"]["max_weighted_item_volume_slippage_allowance"]
+    )
     assert 0 <= MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE
 else:
     MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE = None
 
-WEIGHTED_ITEM_VOLUME_HIGH_VALUE_BIAS = float(settings["Trading"]["weighted_item_volume_high_value_bias"])
+WEIGHTED_ITEM_VOLUME_HIGH_VALUE_BIAS = float(
+    settings["Trading"]["weighted_item_volume_high_value_bias"]
+)
 
-ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED = settings["Trading"]["additional_minimum_value_gain_per_item_downgraded"]
+ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED = settings["Trading"][
+    "additional_minimum_value_gain_per_item_downgraded"
+]
 
 if ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED == "none":
     ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED = 0
 else:
-    ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED = float(ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED)
+    ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED = float(
+        ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED
+    )
 
 # TRADE_QUEUE_GROWTH_PER_MINUTE_TARGET = settings["Trading"]["trades_queue_growth_per_minute_target"]
 # if TRADE_QUEUE_GROWTH_PER_MINUTE_TARGET == "none":
@@ -120,7 +129,9 @@ def calculate_volume(value, volume):
 
 def get_xsrf():
     response = session.get("https://www.roblox.com/upgrades/robux?ctx=nav")
-    match = re.findall(r'<meta name="csrf-token" data-token="?([^>"]+)"? />', response.text)
+    match = re.findall(
+        r'<meta name="csrf-token" data-token="?([^>"]+)"? />', response.text
+    )
 
     return match[0]
 
@@ -133,18 +144,24 @@ def add_extra_info(item):
         item["name"] = item_name_encoded
         item["itemId"] = int(item["assetId"])
 
-        item["ImageLink"] = "https://www.roblox.com/asset-thumbnail/image?assetId=%i&height=110&width=110" % (
-            item["assetId"])
+        item["ImageLink"] = (
+            "https://www.roblox.com/asset-thumbnail/image?assetId=%i&height=110&width=110"
+            % (item["assetId"])
+        )
         item["ItemLink"] = "https://www.roblox.com/catalog/%i/--" % item["assetId"]
         item["SerialNumber"] = item["serialNumber"]
-        item["SerialNumberTotal"] = item["assetStock"]  # I think this is correct but not entirely sure
+        item["SerialNumberTotal"] = item[
+            "assetStock"
+        ]  # I think this is correct but not entirely sure
         item["OriginalPrice"] = item["originalPrice"]
         item["userAssetID"] = item["assetId"]
         item["UserAssetID"] = item["assetId"]
 
-        membership_type = item["buildersClubMembershipType"] if \
-            "buildersClubMembershipType" in item else \
-            item["membershipType"]
+        membership_type = (
+            item["buildersClubMembershipType"]
+            if "buildersClubMembershipType" in item
+            else item["membershipType"]
+        )
         item["buildersClubMembershipType"] = membership_type
         item["MembershipLevel"] = membership_type
         item["AveragePrice"] = int(item["recentAveragePrice"])
@@ -157,6 +174,10 @@ def add_extra_info(item):
         item["AveragePrice"] = int(item["AveragePrice"])
 
     item_data = valuemanager.get_value(item["itemId"])
+
+    if item_data is None:
+        return None
+
     item["value"] = item_data["value"]
     item["OriginalVolume"] = item_data["volume"]
     try:
@@ -172,13 +193,17 @@ class FailedToLoadInventoryException(Exception):
     pass
 
 
+class AllSelfItemsHoldException(Exception):
+    pass
+
+
 @cached(cache=TTLCache(maxsize=4096, ttl=300))
 def get_inventory(user_id):
     user_id = int(user_id)
 
     inventory_raw = []
 
-    #NOTE: I don't like the original approach because you get ratelimited every user you scan -Flaried
+    # NOTE: I don't like the original approach because you get ratelimited every user you scan -Flaried
 
     # Good job tardblox, now I get to send EVEN MORE http requests to your server :DDDDD
     # Wasting resources is fun! 8x more to be exact :-)
@@ -193,8 +218,14 @@ def get_inventory(user_id):
         data = None
 
         for i in range(5):  # Up to 5 attempts
-            url ="https://inventory.roblox.com/v1/users/%(userId)i/assets/collectibles?""cursor=%(cursor)s&sortOrder=Desc&limit=100" % { # &assetType=%(assetTypeId)i" % {
-                "userId": int(user_id), "cursor": cursor}#, "assetTypeId": assetTypeId}
+            url = (
+                "https://inventory.roblox.com/v1/users/%(userId)i/assets/collectibles?"
+                "cursor=%(cursor)s&sortOrder=Desc&limit=100"
+                % {  # &assetType=%(assetTypeId)i" % {
+                    "userId": int(user_id),
+                    "cursor": cursor,
+                }
+            )  # , "assetTypeId": assetTypeId}
             response = session.get(url)
 
             data = json.loads(response.text)
@@ -204,14 +235,13 @@ def get_inventory(user_id):
                 time.sleep(1)
                 continue
 
-            if response.status_code == 429: 
+            if response.status_code == 429:
                 log("Loading Inventory throttled retrying.", mycolors.WARNING)
                 time.sleep(10)
                 if i >= 5:
                     log("Failed to load inventory. Exiting.", mycolors.FAIL)
                     sys.exit(0)
                 continue
-
 
             if "errors" in data:
                 for err in data["errors"]:
@@ -226,15 +256,24 @@ def get_inventory(user_id):
     inventory = []
     for item in inventory_raw:
         new_item = add_extra_info(item)
+        if new_item is None:
+            continue
         # Only do this for our inventory
-        if (settings["Trading"]["value_op_items_at_rap"] == "true" and int(
-                session.cookies['user_id']) == user_id):
+        if (
+            settings["Trading"]["value_op_items_at_rap"] == "true"
+            and int(session.cookies["user_id"]) == user_id
+        ):
             if new_item["AveragePrice"] > new_item["value"]:
                 new_item["value"] = new_item["AveragePrice"]
         inventory.append(new_item)
 
     inventory = [item for item in inventory if item["value"] > 0]
-    inventory = [item for item in inventory if item["value"] <= int(settings["Trading"]["maximum_item_value"])]
+    inventory = [
+        item
+        for item in inventory
+        if item["value"] <= int(settings["Trading"]["maximum_item_value"])
+        and not item["isOnHold"]
+    ]
 
     return inventory
 
@@ -245,33 +284,48 @@ def sale_manager():
 
     while True:
         try:
-            my_inventory = get_inventory(session.cookies['user_id'])
+            my_inventory = get_inventory(session.cookies["user_id"])
             filtered_inventory = []
             for item in my_inventory:
-                if not item["itemId"] in safeItems and \
-                        item["itemId"] not in do_not_trade_away and \
-                        not item["value"] > int(settings["Trading"]["maximum_item_value"]):
+                if (
+                    item["itemId"] not in safeItems
+                    and item["itemId"] not in do_not_trade_away
+                    and not item["value"]
+                    > int(settings["Trading"]["maximum_item_value"])
+                ):
                     filtered_inventory.append(item)
             for item in filtered_inventory:
                 try:
                     item_info = json.loads(
-                        session.get("https://api.roblox.com/Marketplace/ProductInfo?assetId=%i" % item["itemId"]).text)
+                        session.get(
+                            "https://api.roblox.com/Marketplace/ProductInfo?assetId=%i"
+                            % item["itemId"]
+                        ).text
+                    )
 
-                    response = session.get("https://economy.roblox.com/v1/assets/%i/resellers?limit=10&cursor="
-                                           % item_info["AssetId"])
+                    response = session.get(
+                        "https://economy.roblox.com/v1/assets/%i/resellers?limit=10&cursor="
+                        % item_info["AssetId"]
+                    )
                     decoded_json = json.loads(response.text)
 
                     sellers = decoded_json["data"]
 
-                    price = max(item["AveragePrice"], item["value"]) / .7 * float(
-                        settings["Trading"]["sale_price_multiplier"])
+                    price = (
+                        max(item["AveragePrice"], item["value"])
+                        / 0.7
+                        * float(settings["Trading"]["sale_price_multiplier"])
+                    )
                     place_on_sale = False
                     if 1 <= reseller_position <= 9:
                         for i in range(reseller_position, 10):
                             if len(sellers) >= i:
                                 competitor = sellers[i - 1]
-                                if competitor["seller"]["id"] != int(session.cookies['user_id']) \
-                                        or competitor["userAssetId"] == item["userAssetId"]:
+                                if (
+                                    competitor["seller"]["id"]
+                                    != int(session.cookies["user_id"])
+                                    or competitor["userAssetId"] == item["userAssetId"]
+                                ):
                                     if competitor["userAssetId"] == item["userAssetId"]:
                                         price = competitor["price"]
                                     else:
@@ -294,49 +348,72 @@ def sale_manager():
 
                     xsrf = get_xsrf()
 
-                    if (max(item["value"], item["AveragePrice"]) > int(
-                            settings["Trading"]["maximum_item_value_for_resale"])):
+                    if max(item["value"], item["AveragePrice"]) > int(
+                        settings["Trading"]["maximum_item_value_for_resale"]
+                    ):
                         place_on_sale = False
 
                     if place_on_sale:
-                        log("Placing %s (%i) for sale at price %i." % (item["Name"], item["itemId"], price),
-                            mycolors.OKBLUE, post_to_webhook=True)
+                        log(
+                            "Placing %s (%i) for sale at price %i."
+                            % (item["Name"], item["itemId"], price),
+                            mycolors.OKBLUE,
+                            post_to_webhook=True,
+                        )
                         data = {
                             "assetId": item["itemId"],
                             "userAssetId": item["userAssetId"],
                             "price": price,
-                            "sell": True
+                            "sell": True,
                         }
                     else:
                         log(
-                            "Taking item off sale %s (%i)." % (item["Name"], item["itemId"]),
+                            "Taking item off sale %s (%i)."
+                            % (item["Name"], item["itemId"]),
                             mycolors.OKBLUE,
-                            post_to_webhook=True
+                            post_to_webhook=True,
                         )
                         data = {
                             "assetId": item["itemId"],
                             "userAssetId": item["userAssetId"],
                             "price": 0,
-                            "sell": False
+                            "sell": False,
                         }
 
                     if settings["Debugging"]["easy_debug"] == "false" and not testing:
-                        response = session.post("https://www.roblox.com/asset/toggle-sale",
-                                                headers={"X-CSRF-TOKEN": xsrf}, data=data)
+                        response = session.post(
+                            "https://www.roblox.com/asset/toggle-sale",
+                            headers={"X-CSRF-TOKEN": xsrf},
+                            data=data,
+                        )
                         if response.status_code != 200:
                             raise Exception
 
-                    time.sleep(float(settings["Trading"]["interval_between_placing_items_on_sale"]))
+                    time.sleep(
+                        float(
+                            settings["Trading"][
+                                "interval_between_placing_items_on_sale"
+                            ]
+                        )
+                    )
                 except Exception:
                     log("Caught exception in sale manager.", mycolors.FAIL)
                     logging.exception("Caught exception in sale manager.")
-                    time.sleep(float(settings["Trading"]["interval_between_placing_items_on_sale"]))
+                    time.sleep(
+                        float(
+                            settings["Trading"][
+                                "interval_between_placing_items_on_sale"
+                            ]
+                        )
+                    )
                     continue
 
         except Exception:
             log("Caught exception in sale manager.", mycolors.FAIL)
             logging.exception("Caught exception in sale manager.")
-            time.sleep(float(settings["Trading"]["interval_between_placing_items_on_sale"]))
+            time.sleep(
+                float(settings["Trading"]["interval_between_placing_items_on_sale"])
+            )
             continue
 
 
@@ -350,16 +427,14 @@ def trade_side_to_str(side):
 def create_offer(user_id, items, robux):
     return {
         "userId": user_id,
-        "userAssetIds": [
-            item["userAssetId"] for item in items
-        ],
-        "robux": robux
+        "userAssetIds": [item["userAssetId"] for item in items],
+        "robux": robux,
     }
 
 
 def remove_trades_with_invalid_items_from_queue():
     global trade_queue_insertion_timestamps
-    my_inventory = get_inventory(session.cookies['user_id'])
+    my_inventory = get_inventory(session.cookies["user_id"])
     my_uaids = [item["userAssetId"] for item in my_inventory]
 
     for trade in tradeSendQueue:
@@ -371,24 +446,41 @@ def remove_trades_with_invalid_items_from_queue():
     trade_queue_insertion_timestamps = []
 
 
-def send_trade(user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_repeat=False):
+on_trade_hold = False
+
+
+def send_trade(
+    user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_repeat=False
+):
     global clock
 
     offer_nice = trade_side_to_str(trade[1])
     ask_nice = trade_side_to_str(trade[2])
 
-    log("Offering %s (%i)[%i]\tRequesting %s (%i)[%i]. {%f} (%i left in queue)..." % (
-        offer_nice, trade[0][1], trade[0][3], ask_nice, trade[0][2], trade[0][4], trade[0][0], len(tradeSendQueue)),
-        mycolors.OKGREEN, post_to_webhook=(not is_repeat))
+    log(
+        "Offering %s (%i)[%i]\tRequesting %s (%i)[%i]. {%f} (%i left in queue)..."
+        % (
+            offer_nice,
+            trade[0][1],
+            trade[0][3],
+            ask_nice,
+            trade[0][2],
+            trade[0][4],
+            trade[0][0],
+            len(tradeSendQueue),
+        ),
+        mycolors.OKGREEN,
+        post_to_webhook=(not is_repeat),
+    )
 
     offers = [
-        create_offer(session.cookies['user_id'], trade[1], 0),
-        create_offer(user_id, trade[2], their_robux)
+        create_offer(session.cookies["user_id"], trade[1], 0),
+        create_offer(user_id, trade[2], their_robux),
     ]
 
     if not skip_clock:
         while clock > 0:
-            time.sleep(.5)
+            time.sleep(0.5)
 
     cooldowns.add_cooldown(user_id)
 
@@ -396,9 +488,7 @@ def send_trade(user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_r
         response = session.post(
             "https://trades.roblox.com/v1/trades/send",
             headers={"X-CSRF-TOKEN": get_xsrf()},
-            json={
-                "offers": offers
-            }
+            json={"offers": offers},
         )
 
         data = json.loads(response.text)
@@ -421,28 +511,56 @@ def send_trade(user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_r
 
         if response.status_code == 429:
             if "errors" in response.json():
-                if "you are sending too many trade requests" in response.json()['errors'][0]['message'].lower():
-                            log(f"{session.cookies['username']} has hit the daily 100 trade limit exiting", mycolors.WARNING)
-                            os._exit(0)
-                            return "ratelimited"
-
-
-
-            log("Trade with %i: Roblox is throttling us, waiting and trying again. Current cooldown is at %i."
-                % (user_id, trade_cooldown_time), mycolors.WARNING)
+                if (
+                    "you are sending too many trade requests"
+                    in response.json()["errors"][0]["message"].lower()
+                ):
+                    cooldowns.items_on_hold_event.set()
+                    log(
+                        f"{session.cookies['username']} has hit the daily 100 trade limit waiting 3 hours, then retrying",
+                        mycolors.WARNING,
+                        post_to_webhook=True,
+                    )
+                    time.sleep(10800)
+                    cooldowns.items_on_hold_event.clear()
+                    return
+            log(
+                "Trade with %i: Roblox is throttling us, waiting and trying again. Current cooldown is at %i."
+                % (user_id, trade_cooldown_time),
+                mycolors.WARNING,
+            )
 
             if auto_adjust_time_between_trades:
                 trade_cooldown_time += 1
             clock = trade_cooldown_time
-            send_trade(user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True)
+            send_trade(
+                user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True
+            )
         else:
             log("Failed to send trade. %s" % error_output_text, mycolors.FAIL)
             if "Challenge is required to authorize the request" in error_output_text:
                 ok = Authenticator.validate_2fa(response, session)
-                log(f"response from 2fa: {of}", no_print=True)
-                send_trade(user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True)
+                log(f"response from 2fa: {ok}", no_print=True)
+                send_trade(
+                    user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True
+                )
             if "userAssets are invalid" in error_output_text:
                 remove_trades_with_invalid_items_from_queue()
+            if "One or more UserAssets are on hold" in error_output_text:
+                # Set the hold_event to stop the searching for players to pause
+                cooldowns.items_on_hold_event.set()
+
+                while True:
+                    remove_trades_with_invalid_items_from_queue()
+                    if len(get_inventory(session.cookies["user_id"])) > 0:
+                        # stop the on_hold event
+                        cooldowns.items_on_hold_event.clear()
+                        break
+                    log(
+                        "All items on hold, waiting 30 minutes, then refreshing...",
+                        post_to_webhook=True,
+                    )
+                    time.sleep(1800)
     else:
         log("Trade sent successfully.", mycolors.OKGREEN)
 
@@ -456,7 +574,7 @@ def cubic_root(x):
 
 
 def calculate_score(x):
-    return (0.200844 * cubic_root(x - 0.995808)) + (0.0237571 * x ** 7) + 0.192809
+    return (0.200844 * cubic_root(x - 0.995808)) + (0.0237571 * x**7) + 0.192809
 
 
 def pull_trade(session_id):
@@ -473,7 +591,9 @@ def calculate_weighted_volume_average(items):
     total = 0.0
     divisor = 0.0
     for item in items:
-        effective_value = item["value"] ** WEIGHTED_ITEM_VOLUME_HIGH_VALUE_BIAS  # Apply high value bias to our value
+        effective_value = (
+            item["value"] ** WEIGHTED_ITEM_VOLUME_HIGH_VALUE_BIAS
+        )  # Apply high value bias to our value
         total += effective_value * item["volume"]
         divisor += effective_value
 
@@ -493,10 +613,14 @@ def listen_for_inbound_trades():
             cursor = None
             while True:
                 response = session.get(
-                    "https://trades.roblox.com/v1/trades/inbound?%s" % "cursor=" + (cursor if cursor else ""))
+                    "https://trades.roblox.com/v1/trades/inbound?%s" % "cursor="
+                    + (cursor if cursor else "")
+                )
 
                 if response.status_code == 429:
-                    logging.info("Inbound checker getting throttled. Waiting and trying again.")
+                    logging.info(
+                        "Inbound checker getting throttled. Waiting and trying again."
+                    )
                     time.sleep(30)
                     continue
 
@@ -521,7 +645,7 @@ def listen_for_inbound_trades():
                 their_offer = None
 
                 for offer in trade_data["offers"]:
-                    if int(offer["user"]["id"]) == int(session.cookies['user_id']):
+                    if int(offer["user"]["id"]) == int(session.cookies["user_id"]):
                         my_offer = copy.deepcopy(offer)
                     else:
                         their_offer = copy.deepcopy(offer)
@@ -529,8 +653,17 @@ def listen_for_inbound_trades():
                 assert my_offer is not None
                 assert their_offer is not None
 
-                my_items = [add_extra_info(item) for item in my_offer["userAssets"]]
-                their_items = [add_extra_info(item) for item in their_offer["userAssets"]]
+                my_items = [
+                    info
+                    for item in my_offer["userAssets"]
+                    if (info := add_extra_info(item)) is not None
+                ]
+
+                their_items = [
+                    info
+                    for item in their_offer["userAssets"]
+                    if (info := add_extra_info(item)) is not None
+                ]
 
                 my_items_original = copy.deepcopy(my_items)
                 their_items_original = copy.deepcopy(their_items)
@@ -548,8 +681,10 @@ def listen_for_inbound_trades():
                         include = False
                         reason = "Item value is 0."
 
-                    if settings["Trading"]["only_trade_accessories"] == "true" and \
-                            typevalues.get_type(item["itemId"]) != 1:
+                    if (
+                        settings["Trading"]["only_trade_accessories"] == "true"
+                        and typevalues.get_type(item["itemId"]) != 1
+                    ):
                         include = False
                         reason = "Item is not an accessory."
 
@@ -589,7 +724,10 @@ def listen_for_inbound_trades():
                         contains_bad_item = True
                     if item["itemId"] in do_not_trade_away:
                         contains_bad_item = True
-                    if item["value"] > max_item_value or item["AveragePrice"] > max_item_value:
+                    if (
+                        item["value"] > max_item_value
+                        or item["AveragePrice"] > max_item_value
+                    ):
                         contains_bad_item = True
                     if settings["Trading"]["only_trade_accessories"] == "true":
                         item_type = typevalues.get_type(item["itemId"])
@@ -613,7 +751,9 @@ def listen_for_inbound_trades():
                     their_total_rap += item["AveragePrice"]
 
                 if settings["Trading"]["minimum_value_gain"] != "none":
-                    minimum_value_gain = float(settings["Trading"]["minimum_value_gain"])
+                    minimum_value_gain = float(
+                        settings["Trading"]["minimum_value_gain"]
+                    )
                 else:
                     minimum_value_gain = None
 
@@ -639,11 +779,21 @@ def listen_for_inbound_trades():
 
                     num_downgraded = max(0, their_num - my_num)
 
-                    if num_downgraded > 0 and ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED > 0:
+                    if (
+                        num_downgraded > 0
+                        and ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED > 0
+                    ):
                         if 1 > ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED > 0:
-                            their_value_requirement += my_total * ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED * num_downgraded
+                            their_value_requirement += (
+                                my_total
+                                * ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED
+                                * num_downgraded
+                            )
                         else:
-                            their_value_requirement += ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED * num_downgraded
+                            their_value_requirement += (
+                                ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED
+                                * num_downgraded
+                            )
                     meets_value_requirement = their_total >= their_value_requirement
                 else:
                     if settings["Trading"]["safety"] != "false":
@@ -654,41 +804,68 @@ def listen_for_inbound_trades():
                 meets_rap_requirement = False
                 if minimum_rap_gain is not None:
                     if 1 > minimum_rap_gain >= 0:
-                        meets_rap_requirement = their_total_rap >= my_total_rap * (1 + minimum_rap_gain)
+                        meets_rap_requirement = their_total_rap >= my_total_rap * (
+                            1 + minimum_rap_gain
+                        )
                     elif minimum_rap_gain >= 1:
-                        meets_rap_requirement = their_total_rap >= my_total_rap + minimum_rap_gain
+                        meets_rap_requirement = (
+                            their_total_rap >= my_total_rap + minimum_rap_gain
+                        )
                 else:
                     meets_rap_requirement = True
 
-                if max(my_total_rap, their_total_rap, my_total, their_total) > max_handle_value:
+                if (
+                    max(my_total_rap, their_total_rap, my_total, their_total)
+                    > max_handle_value
+                ):
                     # Ignore the trade
                     continue
 
                 # Check if it meets the max_weighted_item_volume_slippage_allowance
                 meets_volume_slippage_allowance = True
                 if MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE is not None:
-                    our_weighted_volume_average = calculate_weighted_volume_average(my_items)
-                    partner_weighted_volume_average = calculate_weighted_volume_average(their_items)
-                    calculated_minimum_weighted_volume_average = (
-                        our_weighted_volume_average * (1 - MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE)
+                    our_weighted_volume_average = calculate_weighted_volume_average(
+                        my_items
                     )
-                    meets_volume_slippage_allowance = partner_weighted_volume_average >= \
-                                                      calculated_minimum_weighted_volume_average
+                    partner_weighted_volume_average = calculate_weighted_volume_average(
+                        their_items
+                    )
+                    calculated_minimum_weighted_volume_average = (
+                        our_weighted_volume_average
+                        * (1 - MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE)
+                    )
+                    meets_volume_slippage_allowance = (
+                        partner_weighted_volume_average
+                        >= calculated_minimum_weighted_volume_average
+                    )
 
                 if not meets_volume_slippage_allowance:
                     log("Trade fails to meet maximum volume slippage allowance.")
 
-                if meets_value_requirement and \
-                        meets_rap_requirement and \
-                        my_robux == 0 and \
-                        not contains_bad_item and \
-                        meets_volume_slippage_allowance:
+                if (
+                    meets_value_requirement
+                    and meets_rap_requirement
+                    and my_robux == 0
+                    and not contains_bad_item
+                    and meets_volume_slippage_allowance
+                ):
                     # It's a good trade
-                    score = (their_total - my_total)
+                    score = their_total - my_total
 
                     good_trades.append(
-                        [[score, my_total, their_total, my_total_rap, their_total_rap], my_items_original,
-                         their_items_original, tradeInfo])
+                        [
+                            [
+                                score,
+                                my_total,
+                                their_total,
+                                my_total_rap,
+                                their_total_rap,
+                            ],
+                            my_items_original,
+                            their_items_original,
+                            tradeInfo,
+                        ]
+                    )
                 elif settings["Trading"]["accept_but_dont_decline"] != "true":
                     my_side_nice_data = []
                     for item in my_items:
@@ -700,17 +877,23 @@ def listen_for_inbound_trades():
                         their_side_nice_data.append(item["Name"])
                     their_side_nice = str(their_side_nice_data)
 
-                    log("Declining trade: %s (%i)[%i]\tfor %s (%i)[%i]..." % (
-                        my_side_nice,
-                        my_total,
-                        my_total_rap,
-                        their_side_nice,
-                        their_total,
-                        their_total_rap
-                    ), mycolors.OKBLUE, post_to_webhook=True)
+                    log(
+                        "Declining trade: %s (%i)[%i]\tfor %s (%i)[%i]..."
+                        % (
+                            my_side_nice,
+                            my_total,
+                            my_total_rap,
+                            their_side_nice,
+                            their_total,
+                            their_total_rap,
+                        ),
+                        mycolors.OKBLUE,
+                        post_to_webhook=True,
+                    )
                     if settings["Debugging"]["easy_debug"] == "false" and not testing:
                         session.post(
-                            "https://trades.roblox.com/v1/trades/%i/decline" % int(tradeInfo["id"]),
+                            "https://trades.roblox.com/v1/trades/%i/decline"
+                            % int(tradeInfo["id"]),
                             headers={"X-CSRF-TOKEN": get_xsrf()},
                         )
 
@@ -721,19 +904,31 @@ def listen_for_inbound_trades():
                 offer_nice = trade_side_to_str(trade[1])
                 ask_nice = trade_side_to_str(trade[2])
 
-                log("Accepting trade: %s (%i)[%i]\tfor %s (%i)[%i]..." % (
-                    offer_nice, trade[0][1], trade[0][3], ask_nice, trade[0][2], trade[0][4]),
+                log(
+                    "Accepting trade: %s (%i)[%i]\tfor %s (%i)[%i]..."
+                    % (
+                        offer_nice,
+                        trade[0][1],
+                        trade[0][3],
+                        ask_nice,
+                        trade[0][2],
+                        trade[0][4],
+                    ),
                     mycolors.OKGREEN,
-                    post_to_webhook=True
+                    post_to_webhook=True,
                 )
 
                 session.post(
-                    "https://trades.roblox.com/v1/trades/%i/accept" % int(trade[3]["id"]),
-                    headers={"X-CSRF-TOKEN": get_xsrf()}
+                    "https://trades.roblox.com/v1/trades/%i/accept"
+                    % int(trade[3]["id"]),
+                    headers={"X-CSRF-TOKEN": get_xsrf()},
                 )
         except Exception:
             logging.exception("Caught exception in inbound trading loop.")
-            log("Found exception in inbound trading loop. Check log for more details.", mycolors.FAIL)
+            log(
+                "Found exception in inbound trading loop. Check log for more details.",
+                mycolors.FAIL,
+            )
             time.sleep(30)
             continue
 
@@ -759,7 +954,11 @@ def update_score_threshold():
         ten_minutes_ago = now - 10 * 60
 
         # Filter out all the timestamps that are too old
-        trade_queue_insertion_timestamps = [stamp for stamp in trade_queue_insertion_timestamps if stamp[0] >= ten_minutes_ago]
+        trade_queue_insertion_timestamps = [
+            stamp
+            for stamp in trade_queue_insertion_timestamps
+            if stamp[0] >= ten_minutes_ago
+        ]
 
         if len(trade_queue_insertion_timestamps) == 0:
             average_growth = 0
@@ -775,24 +974,29 @@ def update_score_threshold():
             except ZeroDivisionError:
                 average_growth = 999
         else:
-            net_growth = trade_queue_insertion_timestamps[-1][1] - trade_queue_insertion_timestamps[0][1]
+            net_growth = (
+                trade_queue_insertion_timestamps[-1][1]
+                - trade_queue_insertion_timestamps[0][1]
+            )
             start = trade_queue_insertion_timestamps[0][0]
             end = trade_queue_insertion_timestamps[-1][0]
             seconds_elapsed = end - start
             minutes_elapsed = seconds_elapsed / 60.0
 
             try:
-                average_growth = net_growth/minutes_elapsed
+                average_growth = net_growth / minutes_elapsed
             except ZeroDivisionError:
                 return
 
         clamp = lambda x: max(x, 0.001)
 
         try:
-            percent_diff = abs((TRADE_QUEUE_GROWTH_PER_MINUTE_TARGET - average_growth) / average_growth)
+            percent_diff = abs(
+                (TRADE_QUEUE_GROWTH_PER_MINUTE_TARGET - average_growth) / average_growth
+            )
             needs_adjusting = percent_diff >= 0.01
         except ZeroDivisionError:
-            percent_diff = .2
+            percent_diff = 0.2
             needs_adjusting = True
 
         # delta = min(math.sqrt(percent_diff), 0.1)  # Maximum of 10% adjustment each time
@@ -804,7 +1008,10 @@ def update_score_threshold():
             elif average_growth > TRADE_QUEUE_GROWTH_PER_MINUTE_TARGET:
                 score_threshold = clamp(score_threshold + delta)
 
-        log("Score threshold is now at %f, Average: %f" % (score_threshold, average_growth))
+        log(
+            "Score threshold is now at %f, Average: %f"
+            % (score_threshold, average_growth)
+        )
 
 
 def update_score_threshold_loop():
@@ -839,9 +1046,13 @@ def trade_send_queue_runner():
                 if trade_priority == 1:
                     tradeSendQueue.sort(key=lambda trade: -trade[1][0][0])
                 elif trade_priority == 2:
-                    tradeSendQueue.sort(key=lambda trade: -(trade[1][0][2] - trade[1][0][1]))
+                    tradeSendQueue.sort(
+                        key=lambda trade: -(trade[1][0][2] - trade[1][0][1])
+                    )
                 elif trade_priority == 3:
-                    tradeSendQueue.sort(key=lambda trade: -(trade[1][0][4] - trade[1][0][3]))
+                    tradeSendQueue.sort(
+                        key=lambda trade: -(trade[1][0][4] - trade[1][0][3])
+                    )
                 elif trade_priority == 4:
                     tradeSendQueue.sort(key=lambda trade: -trade[1][0][5])
 
@@ -852,8 +1063,8 @@ def trade_send_queue_runner():
                 send_trade(trade[0], trade[1])
 
             time.sleep(1)
-        except Exception:
-            log("Caught exception in trade sending loop.", mycolors.FAIL)
+        except Exception as error:
+            log(f"Caught exception in trade sending loop: {error}", mycolors.FAIL)
             logging.exception("Caught exception in trade sending loop.")
             continue
 
@@ -870,7 +1081,9 @@ def search_for_trades(user_id, guarantee_trade=False):
     precheck = True
 
     # Check if we are allowed to trade with the user
-    response = session.get("https://trades.roblox.com/v1/users/%i/can-trade-with" % user_id)
+    response = session.get(
+        "https://trades.roblox.com/v1/users/%i/can-trade-with" % user_id
+    )
     # Sometimes Roblox will throttle this,
     # so in that case just don't bother with checking if we can trade with the user.
     if response.status_code == 200:
@@ -883,10 +1096,13 @@ def search_for_trades(user_id, guarantee_trade=False):
     is_admin = False
 
     response = session.get(
-        "https://accountinformation.roblox.com/v1/users/%i/roblox-badges" % user_id)
+        "https://accountinformation.roblox.com/v1/users/%i/roblox-badges" % user_id
+    )
 
     data = json.loads(response.text)
-    if len(data) > 0:  # Apparently Roblox returns a blank dictionary if the user has no badges.
+    if (
+        len(data) > 0
+    ):  # Apparently Roblox returns a blank dictionary if the user has no badges.
         for item in data:
             if item["name"] == "Administrator":
                 is_admin = True
@@ -902,7 +1118,7 @@ def search_for_trades(user_id, guarantee_trade=False):
             pass
         return
 
-    my_inventory = get_inventory(session.cookies['user_id'])
+    my_inventory = get_inventory(session.cookies["user_id"])
 
     try:
         their_inventory = get_inventory(user_id)
@@ -926,21 +1142,31 @@ def search_for_trades(user_id, guarantee_trade=False):
     my_highest_value_affordable = highest_value_affordable(my_inventory, 1.3)
     their_highest_value_affordable = highest_value_affordable(their_inventory, 1)
 
-    my_inventory = [item for item in my_inventory
-                    if item["value"] <= their_highest_value_affordable]
-    their_inventory = [item for item in their_inventory
-                       if item["value"] <= my_highest_value_affordable
-                       and item["volume"] >= float(settings["Trading"]["minimum_volume"])]
+    my_inventory = [
+        item for item in my_inventory if item["value"] <= their_highest_value_affordable
+    ]
+    their_inventory = [
+        item
+        for item in their_inventory
+        if item["value"] <= my_highest_value_affordable
+        and item["volume"] >= float(settings["Trading"]["minimum_volume"])
+    ]
 
     # Protect items from our safe list and make sure the item is old enough
-    my_inventory = [item for item in my_inventory if
-                    item["itemId"] not in safeItems and
-                    item["itemId"] not in do_not_trade_away and
-                    item["age"] >= float(settings["Trading"]["minimum_item_age"])]
-    their_inventory = [item for item in their_inventory
-                       if item["itemId"] not in safeItems and
-                       item["itemId"] not in do_not_trade_for and
-                       item["age"] >= float(settings["Trading"]["minimum_item_age"])]
+    my_inventory = [
+        item
+        for item in my_inventory
+        if item["itemId"] not in safeItems
+        and item["itemId"] not in do_not_trade_away
+        and item["age"] >= float(settings["Trading"]["minimum_item_age"])
+    ]
+    their_inventory = [
+        item
+        for item in their_inventory
+        if item["itemId"] not in safeItems
+        and item["itemId"] not in do_not_trade_for
+        and item["age"] >= float(settings["Trading"]["minimum_item_age"])
+    ]
 
     if len(their_inventory) == 0:
         return
@@ -952,7 +1178,7 @@ def search_for_trades(user_id, guarantee_trade=False):
         counts = {}
         i = 0
         while i < len(inventory):
-            if not inventory[i]["itemId"] in counts:
+            if inventory[i]["itemId"] not in counts:
                 counts[inventory[i]["itemId"]] = 1
             elif counts[inventory[i]["itemId"]] >= item_count:
                 del inventory[i]
@@ -964,11 +1190,18 @@ def search_for_trades(user_id, guarantee_trade=False):
 
         return inventory
 
-    my_inventory = limit_inventory(my_inventory, int(settings["Trading"]["maximum_xv1"]))
-    their_inventory = limit_inventory(their_inventory, int(settings["Trading"]["maximum_1vx"]))
+    my_inventory = limit_inventory(
+        my_inventory, int(settings["Trading"]["maximum_xv1"])
+    )
+    their_inventory = limit_inventory(
+        their_inventory, int(settings["Trading"]["maximum_1vx"])
+    )
 
     if len(my_inventory) == 0:
-        log("There are no tradable items or they have all been filtered out.", mycolors.WARNING)
+        log(
+            "There are no tradable items or they have all been filtered out.",
+            mycolors.WARNING,
+        )
         return
 
     try:
@@ -984,14 +1217,13 @@ def search_for_trades(user_id, guarantee_trade=False):
 
     deadline = max_run_time + time.time()
 
-
     # Use old trade finder
     random.shuffle(my_inventory)
     random.shuffle(their_inventory)
 
     def combos(inventory_length, max_combo_length):
         nums = list(range(inventory_length))
-        lengths = list(range(max_combo_length, 0, -1)) 
+        lengths = list(range(max_combo_length, 0, -1))
 
         if settings["Trading"]["vary_trade_grades"] == "true":
             random.shuffle(nums)
@@ -1008,7 +1240,9 @@ def search_for_trades(user_id, guarantee_trade=False):
                 yield x, y
 
     my_combos = combos(len(my_inventory), int(settings["Trading"]["maximum_xv1"]))
-    their_combos_wrapper = lambda: combos(len(their_inventory), int(settings["Trading"]["maximum_1vx"]))
+    their_combos_wrapper = lambda: combos(
+        len(their_inventory), int(settings["Trading"]["maximum_1vx"])
+    )
 
     combinations = prod(my_combos, their_combos_wrapper)
 
@@ -1040,11 +1274,21 @@ def search_for_trades(user_id, guarantee_trade=False):
                 their_value_requirement = my_total + minimum_value_gain
 
             num_downgraded = max(0, their_num - my_num)
-            if num_downgraded > 0 and ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED > 0:
+            if (
+                num_downgraded > 0
+                and ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED > 0
+            ):
                 if 1 > ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED > 0:
-                    their_value_requirement += my_total * ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED * num_downgraded
+                    their_value_requirement += (
+                        my_total
+                        * ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED
+                        * num_downgraded
+                    )
                 else:
-                    their_value_requirement += ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED * num_downgraded
+                    their_value_requirement += (
+                        ADDITIONAL_MINIMUM_VALUE_GAIN_PER_ITEM_DOWNGRADED
+                        * num_downgraded
+                    )
 
             meets_value_requirement = their_total >= their_value_requirement
 
@@ -1057,7 +1301,9 @@ def search_for_trades(user_id, guarantee_trade=False):
         if minimum_rap_gain is None:
             meets_rap_requirement = True
         if minimum_rap_gain is not None and 1.0 > minimum_rap_gain >= 0.0:
-            meets_rap_requirement = their_total_rap > my_total_rap * (1.0 + minimum_rap_gain)
+            meets_rap_requirement = their_total_rap > my_total_rap * (
+                1.0 + minimum_rap_gain
+            )
         elif minimum_rap_gain is not None and minimum_rap_gain >= 1:
             meets_rap_requirement = their_total_rap > my_total_rap + minimum_rap_gain
 
@@ -1082,11 +1328,13 @@ def search_for_trades(user_id, guarantee_trade=False):
         if MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE is not None:
             our_weighted_volume_average = calculate_weighted_volume_average(offer)
             partner_weighted_volume_average = calculate_weighted_volume_average(ask)
-            calculated_minimum_weighted_volume_average = (
-                    our_weighted_volume_average * (1 - MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE)
+            calculated_minimum_weighted_volume_average = our_weighted_volume_average * (
+                1 - MAX_WEIGHTED_ITEM_VOLUME_SLIPPAGE_ALLOWANCE
             )
-            meets_volume_slippage_allowance = partner_weighted_volume_average >= \
-                                              calculated_minimum_weighted_volume_average
+            meets_volume_slippage_allowance = (
+                partner_weighted_volume_average
+                >= calculated_minimum_weighted_volume_average
+            )
 
         if not meets_volume_slippage_allowance:
             continue
@@ -1100,10 +1348,12 @@ def search_for_trades(user_id, guarantee_trade=False):
         if settings["Trading"]["safety"] != "false" and my_total >= their_total:
             meets_value_requirement = False
 
-        if meets_value_requirement and \
-                meets_rap_requirement and \
-                meets_minimum_trade_value_requirement and \
-                meets_volume_slippage_allowance:
+        if (
+            meets_value_requirement
+            and meets_rap_requirement
+            and meets_minimum_trade_value_requirement
+            and meets_volume_slippage_allowance
+        ):
             # Don't send entirely stupid trades (such as asking for free items)
             my_names = [item["name"] for item in offer]
             their_names = [item["name"] for item in ask]
@@ -1119,17 +1369,20 @@ def search_for_trades(user_id, guarantee_trade=False):
 
             if meets_score_requirement:
                 # log("Found potential trade.", mycolors.WARNING);
-                good_combinations.append([
+                good_combinations.append(
                     [
-                        score,  # 0
-                        my_total,  # 1
-                        their_total,  # 2
-                        my_total_rap,  # 3
-                        their_total_rap,  # 4
-                        trade_total_value  # 5
-                    ],
-                    offer,
-                    ask])
+                        [
+                            score,  # 0
+                            my_total,  # 1
+                            their_total,  # 2
+                            my_total_rap,  # 3
+                            their_total_rap,  # 4
+                            trade_total_value,  # 5
+                        ],
+                        offer,
+                        ask,
+                    ]
+                )
 
     # LETS TRY SOMETHING NEW AGAIN XXDDDDDDDDD
     try:
@@ -1147,7 +1400,9 @@ def search_for_trades(user_id, guarantee_trade=False):
     elif trade_priority == 3:
         good_combinations.sort(key=lambda trade: -(trade[0][4] - trade[0][3]))
     elif trade_priority == 4:
-        good_combinations.sort(key=lambda trade: -trade[0][5])  # Highest total trade value
+        good_combinations.sort(
+            key=lambda trade: -trade[0][5]
+        )  # Highest total trade value
 
     global tradeSendQueue
 
@@ -1157,14 +1412,22 @@ def search_for_trades(user_id, guarantee_trade=False):
         num = random.randint(0, int(calculate_score(1.2) * 1000)) / 1000.0
 
         # goodCombinations[0][0][0] is score
-        add_trade = True  # Always add trades, set False if you want to limit queue length
+        add_trade = (
+            True  # Always add trades, set False if you want to limit queue length
+        )
         append = True  # Changed this from False to True since we are always adding found trades to queue
-        if num * (1.0 - (1.0 / (queue_length + 1))) - (.11 - score_threshold) <= good_combinations[0][0][0] \
-                or guarantee_trade \
-                or queue_length == 0:
+        if (
+            num * (1.0 - (1.0 / (queue_length + 1))) - (0.11 - score_threshold)
+            <= good_combinations[0][0][0]
+            or guarantee_trade
+            or queue_length == 0
+        ):
             add_trade = True
             append = True
-        elif queue_length and good_combinations[0][0][0] > tradeSendQueue[queue_length - 1][1][0][0]:
+        elif (
+            queue_length
+            and good_combinations[0][0][0] > tradeSendQueue[queue_length - 1][1][0][0]
+        ):
             add_trade = True
 
         if add_trade:
@@ -1178,16 +1441,20 @@ def search_for_trades(user_id, guarantee_trade=False):
                 ask_nice_data.append(item["name"])
             ask_nice = str(ask_nice_data)
 
-            log("Adding trade to queue: %s (%i)[%i]\tfor %s (%i)[%i] {%f} (%i left in queue)..." % (
-                offer_nice,
-                good_combinations[0][0][1],
-                good_combinations[0][0][3],
-                ask_nice,
-                good_combinations[0][0][2],
-                good_combinations[0][0][4],
-                good_combinations[0][0][0],
-                len(tradeSendQueue)
-            ), mycolors.OKBLUE)
+            log(
+                "Adding trade to queue: %s (%i)[%i]\tfor %s (%i)[%i] {%f} (%i left in queue)..."
+                % (
+                    offer_nice,
+                    good_combinations[0][0][1],
+                    good_combinations[0][0][3],
+                    ask_nice,
+                    good_combinations[0][0][2],
+                    good_combinations[0][0][4],
+                    good_combinations[0][0][0],
+                    len(tradeSendQueue),
+                ),
+                mycolors.OKBLUE,
+            )
 
             if append:
                 tradeSendQueue.append([user_id, good_combinations[0]])

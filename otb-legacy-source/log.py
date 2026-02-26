@@ -19,24 +19,22 @@ def post_to_webhook_if_enabled(msg):
     if url != "none":
         # Webhook url is enabled, post to it
         try:
-            session.post(
-                url,
-                {
-                    "content": msg
-                }
-            )
-        except:
+            session.post(url, {"content": msg})
+        except Exception:
             logging.exception("Failed to post to webhook URL.")
 
 
 # There's no colors in Windows command prompt :(((
 def log(msg, log_color="\033[0m", no_print=False, post_to_webhook=False):
-    colored_msg = (mycolors.OKBLUE if colors else "") \
-                  + str(time.time()) + ": " \
-                  + ("\033[0m" if colors else "") \
-                  + (log_color if colors else "") \
-                  + str(msg) \
-                  + (mycolors.ENDC if colors else "")
+    colored_msg = (
+        (mycolors.OKBLUE if colors else "")
+        + str(time.time())
+        + ": "
+        + ("\033[0m" if colors else "")
+        + (log_color if colors else "")
+        + str(msg)
+        + (mycolors.ENDC if colors else "")
+    )
     if not no_print:
         print(colored_msg)
     logging.info(str(time.time()) + ": " + str(msg))
