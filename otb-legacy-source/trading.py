@@ -174,6 +174,10 @@ def add_extra_info(item):
         item["AveragePrice"] = int(item["AveragePrice"])
 
     item_data = valuemanager.get_value(item["itemId"])
+
+    if item_data is None:
+        return None
+
     item["value"] = item_data["value"]
     item["OriginalVolume"] = item_data["volume"]
     try:
@@ -252,6 +256,8 @@ def get_inventory(user_id):
     inventory = []
     for item in inventory_raw:
         new_item = add_extra_info(item)
+        if new_item is None:
+            continue
         # Only do this for our inventory
         if (
             settings["Trading"]["value_op_items_at_rap"] == "true"
@@ -647,9 +653,16 @@ def listen_for_inbound_trades():
                 assert my_offer is not None
                 assert their_offer is not None
 
-                my_items = [add_extra_info(item) for item in my_offer["userAssets"]]
+                my_items = [
+                    info
+                    for item in my_offer["userAssets"]
+                    if (info := add_extra_info(item)) is not None
+                ]
+
                 their_items = [
-                    add_extra_info(item) for item in their_offer["userAssets"]
+                    info
+                    for item in their_offer["userAssets"]
+                    if (info := add_extra_info(item)) is not None
                 ]
 
                 my_items_original = copy.deepcopy(my_items)

@@ -149,6 +149,8 @@ def generate_value(item_id):
         result = []
         for item in items:
             dt = parse_date(item["date"])
+            if not dt:
+                return None
             timestamp = time.mktime(dt.timetuple())
             value = item["value"]
 
@@ -163,6 +165,9 @@ def generate_value(item_id):
 
     sales_data = api_data_to_list(decoded["priceDataPoints"])
     volume_data = api_data_to_list(decoded["volumeDataPoints"])
+    if not sales_data or volume_data:
+        log(f"Failed to parse_date of {item_id}, skipping it")
+        return None
 
     now = time.time()
 
@@ -402,6 +407,10 @@ def generate_value(item_id):
 
 
 def get_value(item_id):
+    """
+    Returns a generated value, will return NONE if it fails to parse the item date
+    """
+
     if item_id in values:
         data = values[item_id]
         # Force regeneration of value every day
