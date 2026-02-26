@@ -166,7 +166,7 @@ def generate_value(item_id):
 
     sales_data = api_data_to_list(decoded["priceDataPoints"])
     volume_data = api_data_to_list(decoded["volumeDataPoints"])
-    if not sales_data is None or volume_data is None:
+    if sales_data is None or volume_data is None:
         log(f"Failed to parse_date of {item_id}, skipping it")
         return None
 
