@@ -539,6 +539,11 @@ while True:
         try:
             # noinspection PyBroadException
 
+            # Pause trade search if trade limit or items are on hold
+            if cooldowns.items_on_hold_event.is_set():
+                time.sleep(1800)
+                continue
+
             if len(current_id_set) > 0:
                 nextUserId = current_id_set.pop()
                 if (
