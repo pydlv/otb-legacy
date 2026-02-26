@@ -313,7 +313,7 @@ def find_people():
                 if response.status_code != 200:
                     # Something went wrong with this item. Skip it.
                     logging.warning(
-                        "Roblox had internal server error while fetching item owners."
+                        f"Roblox had internal server error while fetching item owners. item: {item_id} status_code {response.status_code}"
                     )
                     break
                 item_owners = [
