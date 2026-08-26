@@ -496,10 +496,16 @@ def remove_trades_with_invalid_items_from_queue():
 on_trade_hold = False
 
 
-def send_trade(
-    user_id, trade, skip_clock=False, trade_id=0, their_robux=0, is_repeat=False
-):
+def send_trade(user_id, trade, skip_clock=False, trade_id=0, their_robux=0, attempt=0):
     global clock
+
+    # Avoid infinite retries
+    if attempt >= 3:
+        log(
+            f"Trade with {user_id} failed after {attempt} attempts, dropping.",
+            mycolors.FAIL,
+        )
+        return
 
     offer_nice = trade_side_to_str(trade[1])
     ask_nice = trade_side_to_str(trade[2])
@@ -517,7 +523,7 @@ def send_trade(
             len(tradeSendQueue),
         ),
         mycolors.OKGREEN,
-        post_to_webhook=(not is_repeat),
+        post_to_webhook=(attempt == 0),
     )
 
     offers = {
@@ -546,6 +552,7 @@ def send_trade(
     global trade_cooldown_time
 
     if response.status_code != 200:
+        print(response.status_code, response.text)
         # if response["msg"] == "That user has blocked this form of contact." \
         #         or response["msg"] == "You are not authorized to make this trade!" \
         #         or response["msg"] == "You are not authorized to alter this trade!":
@@ -584,19 +591,30 @@ def send_trade(
                 trade_cooldown_time += 1
             clock = trade_cooldown_time
             send_trade(
-                user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True
+                user_id, trade, skip_clock, trade_id, their_robux, attempt=attempt + 1
             )
+        elif response.status_code == 403:
+            if "rblx-challenge-id" in response.headers:
+                ok = Authenticator.validate_2fa(response, session)
+                log(f"response from 2fa: {ok}", no_print=True)
+                send_trade(
+                    user_id,
+                    trade,
+                    skip_clock,
+                    trade_id,
+                    their_robux,
+                    attempt=attempt + 1,
+                )
+            else:
+                log(
+                    f"Failed to send trade, got error unauthorized (status 403). Please check cookie\n {response.text}",
+                    mycolors.FAIL,
+                )
         else:
             log(
                 f"Failed to send trade. {error_output_text} payload: {offers}",
                 mycolors.FAIL,
             )
-            if "Challenge is required to authorize the request" in error_output_text:
-                ok = Authenticator.validate_2fa(response, session)
-                log(f"response from 2fa: {ok}", no_print=True)
-                send_trade(
-                    user_id, trade, skip_clock, trade_id, their_robux, is_repeat=True
-                )
             if "userAssets are invalid" in error_output_text:
                 remove_trades_with_invalid_items_from_queue()
             if "One or more UserAssets are on hold" in error_output_text:
